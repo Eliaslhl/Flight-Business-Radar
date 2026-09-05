@@ -108,6 +108,37 @@ importers:
         specifier: ^0.30.1
         version: 0.30.6
 
+  packages/flight-domain:
+    dependencies:
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+
+  packages/flight-providers:
+    dependencies:
+      '@fbr/flight-domain':
+        specifier: workspace:*
+        version: link:../flight-domain
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/normalizer:
+    dependencies:
+      '@fbr/flight-domain':
+        specifier: workspace:*
+        version: link:../flight-domain
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@fbr/flight-providers':
+        specifier: workspace:*
+        version: link:../flight-providers
+
   packages/shared:
     dependencies:
       pino:

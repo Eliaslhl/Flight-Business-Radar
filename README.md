@@ -10,8 +10,8 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 | ----- | ------------------------------------------------------------------------------------------ | ------------ |
 | 0     | Discovery : audit, providers, architecture, schéma, roadmap                                | ✅ Terminée  |
 | 1     | Foundation : monorepo, TS strict, lint/format, tests, PostgreSQL/Redis, config, Docker, CI | ✅ Terminée  |
-| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer          | 🟢 Prochaine |
-| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                 | ⏳           |
+| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer          | ✅ Terminée  |
+| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                 | 🟢 Prochaine |
 | 4     | Price history : snapshots, statistiques, tendances                                         | ⏳           |
 | 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation             | ⏳           |
 | 6     | Frontend : dashboard Next.js, graphiques, alertes                                          | ⏳           |
@@ -54,10 +54,13 @@ apps/
   api/       Fastify — API REST (+ /health)
   worker/    Process de fond (scheduler + workers BullMQ à partir de la Phase 3)
 packages/
-  shared/    logger pino, erreurs, Result, helpers monétaires, noms d'événements
-  config/    chargement + validation d'environnement (Zod, fail-fast)
-  database/  schéma Drizzle + client postgres.js + migrations
-docs/        ARCHITECTURE, DATABASE, DEVELOPMENT, PHASE-0-DISCOVERY, …
+  shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
+  config/           chargement + validation d'environnement (Zod, fail-fast)
+  flight-domain/    FlightSearchRequest, FlightOffer, value objects, fingerprint
+  flight-providers/ interface FlightProvider, ProviderRegistry, MockFlightProvider
+  normalizer/       contrôle qualité + déduplication des offres
+  database/         schéma Drizzle + client postgres.js + migrations
+docs/               ARCHITECTURE, DATABASE, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY, …
 ```
 
 ## Scripts racine
