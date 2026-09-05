@@ -1,0 +1,50 @@
+import { ConfigError } from "@fbr/shared";
+import { describe, expect, it } from "vitest";
+import { loadConfig } from "./index.js";
+
+const baseEnv = {
+  DATABASE_URL: "postgresql://fbr:fbr@localhost:5432/fbr",
+  REDIS_URL: "redis://localhost:6379",
+} satisfies NodeJS.ProcessEnv;
+
+describe("loadConfig", () => {
+  it("applique les valeurs par défaut avec un env minimal", () => {
+    const cfg = loadConfig({ ...baseEnv });
+    expect(cfg.env).toBe("development");
+    expect(cfg.isProduction).toBe(false);
+    expect(cfg.log).toEqual({ level: "info", pretty: false });
+    expect(cfg.api).toEqual({ host: "0.0.0.0", port: 3001 });
+    expect(cfg.currency).toEqual({ base: "EUR", fxSource: "frankfurter" });
+    expect(cfg.providers.serpapi).toBeNull();
+  });
+
+  it("coerce les types (port, booléens) et structure les providers", () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      NODE_ENV: "production",
+      API_PORT: "8080",
+      LOG_PRETTY: "true",
+      SERPAPI_API_KEY: "key-123",
+    });
+    expect(cfg.isProduction).toBe(true);
+    expect(cfg.api.port).toBe(8080);
+    expect(cfg.log.pretty).toBe(true);
+    expect(cfg.providers.serpapi).toEqual({ apiKey: "key-123" });
+  });
+
+  it("lève ConfigError listant les variables invalides", () => {
+    try {
+      loadConfig({ DATABASE_URL: "mysql://x", REDIS_URL: "redis://localhost" });
+      expect.unreachable("aurait dû lever");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ConfigError);
+      const ctx = (e as ConfigError).context;
+      const paths = (ctx.issues as { path: string }[]).map((i) => i.path);
+      expect(paths).toContain("DATABASE_URL");
+    }
+  });
+
+  it("rejette un NODE_ENV inconnu", () => {
+    expect(() => loadConfig({ ...baseEnv, NODE_ENV: "staging" })).toThrow(ConfigError);
+  });
+});

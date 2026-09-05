@@ -1,0 +1,5 @@
+**/dist/**
+**/coverage/**
+**/.turbo/**
+**/drizzle/**
+pnpm-lock.yaml

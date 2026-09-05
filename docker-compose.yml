@@ -1,0 +1,39 @@
+name: flight-business-radar
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fbr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fbr
+      POSTGRES_PASSWORD: fbr
+      POSTGRES_DB: fbr
+    ports:
+      - "5432:5432"
+    volumes:
+      - fbr-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fbr -d fbr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fbr-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - fbr-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  fbr-pg-data:
+  fbr-redis-data:

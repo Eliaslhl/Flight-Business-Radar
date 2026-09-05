@@ -1,0 +1,25 @@
+{
+  "name": "@fbr/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rimraf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@fbr/config": "workspace:*",
+    "@fbr/database": "workspace:*",
+    "@fbr/shared": "workspace:*",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
