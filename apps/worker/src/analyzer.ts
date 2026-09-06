@@ -6,6 +6,7 @@ import {
   listOpenDropEventsForOffer,
   resolvePriceEvents,
   type Database,
+  type InsertedPriceEvent,
   type SearchRow,
 } from "@fbr/database";
 import { LogEvent, type Logger } from "@fbr/shared";
@@ -19,6 +20,8 @@ export interface AnalyzerDeps {
 export interface AnalyzeResult {
   readonly eventsDetected: number;
   readonly eventsResolved: number;
+  /** Événements nouvellement persistés — consommés par le pipeline d'alerte. */
+  readonly detected: InsertedPriceEvent[];
 }
 
 /** Tolérance de « retour au prix » pour clore une baisse ouverte (3 %). */
@@ -35,8 +38,8 @@ export const analyzeOffers = async (
   params: { search: SearchRow; offerIds: readonly string[]; now: Date },
 ): Promise<AnalyzeResult> => {
   const targetEurCents = params.search.targetPriceCents ?? undefined; // search.currency == EUR (Phase 4)
-  let eventsDetected = 0;
   let eventsResolved = 0;
+  const detected: InsertedPriceEvent[] = [];
 
   for (const offerId of params.offerIds) {
     const recent = await getRecentSnapshotsForOffer(deps.db, offerId, 2);
@@ -73,7 +76,7 @@ export const analyzeOffers = async (
     );
 
     if (derived.length > 0) {
-      await insertPriceEvents(
+      const inserted = await insertPriceEvents(
         deps.db,
         derived.map((e) => ({
           flightOfferId: offerId,
@@ -88,7 +91,7 @@ export const analyzeOffers = async (
           detectedAt: params.now,
         })),
       );
-      eventsDetected += derived.length;
+      detected.push(...inserted);
       for (const e of derived) {
         deps.logger.info(
           {
@@ -119,5 +122,5 @@ export const analyzeOffers = async (
     }
   }
 
-  return { eventsDetected, eventsResolved };
+  return { eventsDetected: detected.length, eventsResolved, detected };
 };

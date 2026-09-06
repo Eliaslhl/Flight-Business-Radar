@@ -69,6 +69,18 @@ export const listSnapshotsForSearch = async (
     .orderBy(desc(priceSnapshots.observedAt))
     .limit(options.limit ?? 500);
 
+/**
+ * Met à jour le **statut** d'un snapshot (OBSERVED → CONFIRMED / EXPIRED).
+ * Le **prix** n'est jamais modifié — la table reste append-only.
+ */
+export const updateSnapshotStatus = async (
+  db: Database,
+  id: number,
+  status: PriceSnapshotRow["status"],
+): Promise<void> => {
+  await db.update(priceSnapshots).set({ status }).where(eq(priceSnapshots.id, id));
+};
+
 export const countSnapshotsForSearch = async (db: Database, searchId: string): Promise<number> => {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })

@@ -74,6 +74,23 @@ Chaque groupe porte `reliable` (échantillon suffisant ou non). Voir [`ANALYTICS
 `price_events` dérivés, le plus récent d'abord :
 `{ id, flightOfferId, type, previousPriceEurCents, newPriceEurCents, dropAmountEurCents, dropPct, confirmed, detectedAt, resolvedAt, durationSeconds }`.
 
+### `GET /api/searches/:id/notifications?limit=200` → `{ notifications: [...] }`
+
+Historique des notifications diffusées, le plus récent d'abord :
+`{ id, alertId, priceEventId, channel, status, subject, body, dedupeKey, createdAt, sentAt, error }`.
+
+## Alertes
+
+| Route                                                                                     | Réponse                                                      |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `POST /api/alerts` — `{ searchId, type, thresholdEurCents?, enabled?, cooldownSeconds? }` | `201` `AlertDto` ; `400` invalide ; `404` recherche inconnue |
+| `GET /api/alerts?searchId=<uuid>`                                                         | `{ alerts: AlertDto[] }`                                     |
+| `POST /api/alerts/:id/enable` \| `/disable`                                               | `AlertDto` \| `404`                                          |
+| `DELETE /api/alerts/:id`                                                                  | `204` \| `404`                                               |
+
+`type` ∈ `TARGET_PRICE` \| `PRICE_DROP` \| `FLASH_DROP` \| `RECORD_LOW` \| `UNUSUAL_PRICE`.
+`AlertDto` : `{ id, searchId, type, thresholdEurCents, enabled, cooldownSeconds, lastTriggeredAt, createdAt }`.
+
 ## `SearchDto`
 
 ```jsonc

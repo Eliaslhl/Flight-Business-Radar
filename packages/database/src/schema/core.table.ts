@@ -257,16 +257,109 @@ export const fxRates = pgTable(
   (t) => [primaryKey({ columns: [t.base, t.quote, t.asOf] })],
 );
 
+// ─── alerts + notifications (Phase 5) ─────────────────────────────────────
+
+export const alertTypeEnum = pgEnum("alert_type", [
+  "TARGET_PRICE",
+  "PRICE_DROP",
+  "FLASH_DROP",
+  "RECORD_LOW",
+  "UNUSUAL_PRICE",
+]);
+
+export const notificationChannelEnum = pgEnum("notification_channel", [
+  "CONSOLE",
+  "EMAIL",
+  "TELEGRAM",
+  "DISCORD",
+  "PUSH",
+]);
+
+export const notificationStatusEnum = pgEnum("notification_status", [
+  "PENDING",
+  "SENT",
+  "FAILED",
+  "SUPPRESSED",
+]);
+
+export const alerts = pgTable(
+  "alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    searchId: uuid("search_id")
+      .notNull()
+      .references(() => searches.id, { onDelete: "cascade" }),
+    type: alertTypeEnum("type").notNull(),
+    /** Plafond de prix (centimes EUR) pour TARGET_PRICE / RECORD_LOW. */
+    thresholdEurCents: integer("threshold_eur_cents"),
+    enabled: boolean("enabled").notNull().default(true),
+    cooldownSeconds: integer("cooldown_seconds").notNull().default(3600),
+    lastTriggeredAt: timestamp("last_triggered_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("alerts_search_enabled_idx").on(t.searchId, t.enabled)],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    searchId: uuid("search_id").references(() => searches.id, { onDelete: "set null" }),
+    alertId: uuid("alert_id").references(() => alerts.id, { onDelete: "set null" }),
+    priceEventId: uuid("price_event_id").references(() => priceEvents.id, { onDelete: "set null" }),
+    channel: notificationChannelEnum("channel").notNull(),
+    status: notificationStatusEnum("status").notNull().default("PENDING"),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    /** Idempotence anti-spam (une par recherche / type / route / jour). */
+    dedupeKey: text("dedupe_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    error: text("error"),
+  },
+  (t) => [
+    uniqueIndex("notifications_dedupe_channel_idx").on(t.dedupeKey, t.channel),
+    index("notifications_search_created_idx").on(t.searchId, t.createdAt),
+  ],
+);
+
 // ─── relations (pour les requêtes typées `db.query`) ────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
   searches: many(searches),
+  alerts: many(alerts),
+  notifications: many(notifications),
 }));
 
 export const searchesRelations = relations(searches, ({ one, many }) => ({
   user: one(users, { fields: [searches.userId], references: [users.id] }),
   dateCombinations: many(searchDateCombinations),
   snapshots: many(priceSnapshots),
+  alerts: many(alerts),
+  notifications: many(notifications),
+}));
+
+export const alertsRelations = relations(alerts, ({ one, many }) => ({
+  user: one(users, { fields: [alerts.userId], references: [users.id] }),
+  search: one(searches, { fields: [alerts.searchId], references: [searches.id] }),
+  notifications: many(notifications),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+  search: one(searches, { fields: [notifications.searchId], references: [searches.id] }),
+  alert: one(alerts, { fields: [notifications.alertId], references: [alerts.id] }),
+  priceEvent: one(priceEvents, {
+    fields: [notifications.priceEventId],
+    references: [priceEvents.id],
+  }),
 }));
 
 export const searchDateCombinationsRelations = relations(searchDateCombinations, ({ one }) => ({
@@ -311,3 +404,7 @@ export type NewPriceSnapshotRow = typeof priceSnapshots.$inferInsert;
 export type PriceEventRow = typeof priceEvents.$inferSelect;
 export type NewPriceEventRow = typeof priceEvents.$inferInsert;
 export type FxRateRow = typeof fxRates.$inferSelect;
+export type AlertRow = typeof alerts.$inferSelect;
+export type NewAlertRow = typeof alerts.$inferInsert;
+export type NotificationRow = typeof notifications.$inferSelect;
+export type NewNotificationRow = typeof notifications.$inferInsert;

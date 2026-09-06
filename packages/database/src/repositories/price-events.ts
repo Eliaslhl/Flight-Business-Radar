@@ -15,12 +15,23 @@ export interface InsertPriceEventInput {
   detectedAt?: Date;
 }
 
+export interface InsertedPriceEvent {
+  id: string;
+  flightOfferId: string;
+  type: PriceEventRow["type"];
+  newPriceEurCents: number;
+  previousPriceEurCents: number | null;
+  dropAmountEurCents: number | null;
+  dropPct: number | null;
+  newSnapshotId: number;
+}
+
 export const insertPriceEvents = async (
   db: Database,
   inputs: readonly InsertPriceEventInput[],
-): Promise<number> => {
-  if (inputs.length === 0) return 0;
-  const rows = await db
+): Promise<InsertedPriceEvent[]> => {
+  if (inputs.length === 0) return [];
+  return db
     .insert(priceEvents)
     .values(
       inputs.map((i) => ({
@@ -36,8 +47,27 @@ export const insertPriceEvents = async (
         ...(i.detectedAt ? { detectedAt: i.detectedAt } : {}),
       })),
     )
-    .returning({ id: priceEvents.id });
-  return rows.length;
+    .returning({
+      id: priceEvents.id,
+      flightOfferId: priceEvents.flightOfferId,
+      type: priceEvents.type,
+      newPriceEurCents: priceEvents.newPriceEurCents,
+      previousPriceEurCents: priceEvents.previousPriceEurCents,
+      dropAmountEurCents: priceEvents.dropAmountEurCents,
+      dropPct: priceEvents.dropPct,
+      newSnapshotId: priceEvents.newSnapshotId,
+    });
+};
+
+export const markPriceEventsConfirmed = async (
+  db: Database,
+  ids: readonly string[],
+): Promise<void> => {
+  if (ids.length === 0) return;
+  await db
+    .update(priceEvents)
+    .set({ confirmed: true })
+    .where(inArray(priceEvents.id, [...ids]));
 };
 
 export const listPriceEventsForSearch = async (

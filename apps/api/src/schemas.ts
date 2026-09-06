@@ -1,3 +1,4 @@
+import { ALERT_TYPES } from "@fbr/alerting";
 import {
   airlineCodeSchema,
   airportCodeSchema,
@@ -46,3 +47,14 @@ export const createSearchBodySchema = z
   );
 
 export type CreateSearchBody = z.infer<typeof createSearchBodySchema>;
+
+/** Corps de `POST /api/alerts`. */
+export const createAlertBodySchema = z.object({
+  searchId: z.string().uuid(),
+  type: z.enum(ALERT_TYPES),
+  thresholdEurCents: z.number().int().positive().optional(),
+  enabled: z.boolean().optional(),
+  cooldownSeconds: z.number().int().nonnegative().max(604_800).optional(),
+});
+
+export type CreateAlertBody = z.infer<typeof createAlertBodySchema>;

@@ -22,6 +22,13 @@
       "when": 1788656685597,
       "tag": "0002_bright_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788657847193,
+      "tag": "0003_spotty_vivisector",
+      "breakpoints": true
     }
   ]
 }

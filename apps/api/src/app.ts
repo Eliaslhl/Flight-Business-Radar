@@ -3,6 +3,7 @@ import { AppError, LogEvent, type Logger } from "@fbr/shared";
 import { pingDatabase, type DbHandle } from "@fbr/database";
 import { type Queue, type SearchRunJobData } from "@fbr/queue";
 import Fastify, { type FastifyError } from "fastify";
+import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerSearchRoutes } from "./routes/searches.js";
 import { type ApiInstance } from "./types.js";
 
@@ -66,6 +67,7 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
       logger,
       analyticsMinSample: config.detection.analyticsMinSample,
     });
+    registerAlertRoutes(app, { db: db.db });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

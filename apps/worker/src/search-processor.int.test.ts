@@ -1,18 +1,36 @@
 import {
   countPriceEventsForSearch,
   countSnapshotsForSearch,
+  createAlert,
   createSearch,
   getSearch,
+  listNotificationsForSearch,
   listPriceEventsForSearch,
   listSnapshotsForSearch,
   type DbHandle,
 } from "@fbr/database";
 import { DEFAULT_DROP_THRESHOLDS } from "@fbr/analytics";
 import { MockFlightProvider, ProviderRegistry } from "@fbr/flight-providers";
+import { NotificationService } from "@fbr/notifications";
 import { createSilentLogger } from "@fbr/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { type ConfirmFn } from "./confirmer.js";
 import { processSearchRun, type SearchProcessorDeps } from "./search-processor.js";
 import { closeTestDb, getTestDb, hasDb, truncateAll } from "./it-support.js";
+
+const captureChannel = () => {
+  const sent: string[] = [];
+  return {
+    sent,
+    channel: {
+      name: "CONSOLE" as const,
+      send: (n: { subject: string }) => {
+        sent.push(n.subject);
+        return Promise.resolve({ channel: "CONSOLE", ok: true });
+      },
+    },
+  };
+};
 
 const suite = hasDb ? describe : describe.skip;
 
@@ -58,7 +76,15 @@ suite("processSearchRun (intégration Postgres)", () => {
       currency: "EUR",
     });
 
-  const deps = (registry: ProviderRegistry, combinationsPerRun = 6): SearchProcessorDeps => ({
+  const okConfirm: ConfirmFn = () =>
+    Promise.resolve([{ priceEurCents: 1, availability: "AVAILABLE" }]); // toujours confirmé
+  const koConfirm: ConfirmFn = () => Promise.resolve([]); // jamais confirmé
+
+  const deps = (
+    registry: ProviderRegistry,
+    combinationsPerRun = 6,
+    over: Partial<SearchProcessorDeps> = {},
+  ): SearchProcessorDeps => ({
     db: handle.db,
     registry,
     logger: createSilentLogger(),
@@ -66,6 +92,9 @@ suite("processSearchRun (intégration Postgres)", () => {
     providerMinIntervalSeconds: 60,
     thresholds: DEFAULT_DROP_THRESHOLDS,
     toBaseCents: (cents) => Promise.resolve(cents), // EUR → identité dans les tests
+    notificationService: new NotificationService({ channels: [] }),
+    confirm: okConfirm,
+    ...over,
   });
 
   it("génère les combinaisons, écrit des snapshots et planifie la prochaine exécution", async () => {
@@ -184,5 +213,84 @@ suite("processSearchRun (intégration Postgres)", () => {
     });
     expect(summary.providerErrors).toBeGreaterThan(0);
     expect(summary.snapshotsInserted).toBeGreaterThan(0);
+  });
+
+  /** Un provider flash-drop **partagé** : son compteur d'appels fait évoluer le prix. */
+  const flashRegistry = () =>
+    new ProviderRegistry([
+      new MockFlightProvider({ name: "mock", scenario: "flash-drop", basePriceEur: 1420 }),
+    ]);
+
+  it("E2E : baisse détectée → confirmée → notification SENT", async () => {
+    const search = await makeSingleComboSearch();
+    await createAlert(handle.db, { searchId: search.id, type: "FLASH_DROP", cooldownSeconds: 0 });
+    const cap = captureChannel();
+    const registry = flashRegistry();
+    const d = deps(registry, 1, {
+      confirm: okConfirm,
+      notificationService: new NotificationService({ channels: [cap.channel] }),
+    });
+
+    let alertsTriggered = 0;
+    for (let i = 0; i < 5; i += 1) {
+      const s = await processSearchRun(d, { searchId: search.id, reason: "manual" });
+      alertsTriggered += s.alertsTriggered;
+    }
+
+    expect(alertsTriggered).toBeGreaterThan(0);
+    expect(cap.sent.some((s) => s.includes("FLASH"))).toBe(true);
+
+    const notifs = await listNotificationsForSearch(handle.db, search.id);
+    expect(notifs.some((n) => n.status === "SENT")).toBe(true);
+    const flashEvent = (await listPriceEventsForSearch(handle.db, search.id)).find(
+      (e) => e.type === "FLASH_DROP",
+    );
+    expect(flashEvent?.confirmed).toBe(true); // marqué confirmé
+  });
+
+  it("E2E : baisse non confirmée → aucune notification, snapshot EXPIRED", async () => {
+    const search = await makeSingleComboSearch();
+    await createAlert(handle.db, { searchId: search.id, type: "FLASH_DROP", cooldownSeconds: 0 });
+    const cap = captureChannel();
+    const registry = flashRegistry();
+    const d = deps(registry, 1, {
+      confirm: koConfirm, // la re-requête ne confirme jamais
+      notificationService: new NotificationService({ channels: [cap.channel] }),
+    });
+
+    let confirmationsFailed = 0;
+    for (let i = 0; i < 5; i += 1) {
+      const s = await processSearchRun(d, { searchId: search.id, reason: "manual" });
+      confirmationsFailed += s.confirmationsFailed;
+    }
+
+    expect(confirmationsFailed).toBeGreaterThan(0);
+    expect(cap.sent).toHaveLength(0);
+    expect(await listNotificationsForSearch(handle.db, search.id)).toHaveLength(0);
+    const snaps = await listSnapshotsForSearch(handle.db, search.id);
+    expect(snaps.some((s) => s.status === "EXPIRED")).toBe(true);
+  });
+
+  it("cooldown : les runs suivants ne redéclenchent pas la notification", async () => {
+    const search = await makeSingleComboSearch();
+    await createAlert(handle.db, {
+      searchId: search.id,
+      type: "PRICE_DROP",
+      cooldownSeconds: 3600,
+    });
+    const cap = captureChannel();
+    const registry = flashRegistry();
+    const d = deps(registry, 1, {
+      notificationService: new NotificationService({ channels: [cap.channel] }),
+    });
+
+    let triggered = 0;
+    for (let i = 0; i < 5; i += 1) {
+      const s = await processSearchRun(d, { searchId: search.id, reason: "manual" });
+      triggered += s.alertsTriggered;
+    }
+
+    expect(triggered).toBe(1); // cooldown 1 h : un seul passage
+    expect(cap.sent).toHaveLength(1);
   });
 });

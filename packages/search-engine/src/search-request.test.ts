@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRequestForCombination,
+  buildRequestForOffer,
   buildWindowRequest,
   type SearchLike,
 } from "./search-request.js";
@@ -59,5 +60,19 @@ describe("buildWindowRequest", () => {
     const req = buildWindowRequest(search);
     expect(req.departureWindow).toEqual({ start: "2026-10-01", end: "2026-12-15" });
     expect(req.tripDuration).toEqual({ minDays: 7, maxDays: 14 });
+  });
+});
+
+describe("buildRequestForOffer", () => {
+  it("cible l'itinéraire exact d'une offre connue", () => {
+    const req = buildRequestForOffer(search, {
+      destination: "ICN",
+      outboundDate: "2026-11-05",
+      returnDate: "2026-11-14",
+      tripDays: 9,
+    });
+    expect(req.destinations).toEqual(["ICN"]);
+    expect(req.departureWindow).toEqual({ start: "2026-11-05", end: "2026-11-05" });
+    expect(req.tripDuration).toEqual({ minDays: 9, maxDays: 9 });
   });
 });

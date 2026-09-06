@@ -4,3 +4,5 @@ export * from "./offers.js";
 export * from "./snapshots.js";
 export * from "./price-events.js";
 export * from "./fx-rates.js";
+export * from "./alerts.js";
+export * from "./notifications.js";
