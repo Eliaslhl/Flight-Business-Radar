@@ -1,8 +1,5 @@
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createLogger } from "@fbr/shared";
-import { createDatabase } from "./client.js";
+import { createDatabase, MIGRATIONS_FOLDER, runMigrations } from "./client.js";
 
 /**
  * Applique les migrations SQL de `packages/database/drizzle/` à la base
@@ -16,11 +13,10 @@ const main = async (): Promise<void> => {
     process.exit(1);
   }
 
-  const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../drizzle");
   const handle = createDatabase({ url, maxConnections: 1 });
   try {
-    logger.info({ migrationsFolder }, "application des migrations");
-    await migrate(handle.db, { migrationsFolder });
+    logger.info({ migrationsFolder: MIGRATIONS_FOLDER }, "application des migrations");
+    await runMigrations(handle);
     logger.info("migrations appliquées");
   } finally {
     await handle.close();

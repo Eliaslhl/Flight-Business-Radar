@@ -12,23 +12,25 @@
 - **Config centralisée** : pas de `process.env` hors de `@fbr/config`.
 - **Logs structurés** : toujours via `@fbr/shared` `createLogger`, avec un `event` nommé (`LogEvent`).
 
-## Packages (état Phase 2)
+## Packages (état Phase 3)
 
-| Package                 | Rôle                                                                                                                                          | Dépend de                           |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `@fbr/shared`           | logger pino (redaction secrets), hiérarchie d'erreurs (`AppError` + `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent` | —                                   |
-| `@fbr/config`           | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                              | `@fbr/shared`                       |
-| `@fbr/flight-domain`    | modèle métier pur : `FlightSearchRequest`, `FlightOffer` (+ schémas Zod), value objects IATA/dates/devise/cabine, `computeFingerprint`        | `@fbr/shared`                       |
-| `@fbr/flight-providers` | interface `FlightProvider`, `ProviderRegistry` (exécution parallèle isolée), `MockFlightProvider` (7 scénarios déterministes)                 | `@fbr/flight-domain`, `@fbr/shared` |
-| `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication par empreinte (`dedupeOffers`), orchestration (`normalizeSearchResults`)                    | `@fbr/flight-domain`, `@fbr/shared` |
-| `@fbr/database`         | schéma Drizzle, client `postgres.js` (`createDatabase`), `pingDatabase`, runner de migrations                                                 | `@fbr/shared`, `@fbr/config` (dev)  |
+| Package                 | Rôle                                                                                                                                        | Dépend de                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `@fbr/shared`           | logger pino (redaction secrets), `AppError` (+ `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent`                    | —                                     |
+| `@fbr/config`           | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                            | `@fbr/shared`                         |
+| `@fbr/flight-domain`    | modèle métier pur : `FlightSearchRequest`, `FlightOffer` (+ schémas Zod), value objects IATA/dates/devise/cabine, `computeFingerprint`      | `@fbr/shared`                         |
+| `@fbr/flight-providers` | interface `FlightProvider`, `ProviderRegistry` (exécution parallèle isolée), `MockFlightProvider` (7 scénarios)                             | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication (`dedupeOffers`), orchestration (`normalizeSearchResults`)                                | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/search-engine`    | pur : `generateDateCombinations` (anti-explosion), `computeSearchPriority`, `computeNextIntervalSeconds` (surveillance adaptative), mappers | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/queue`            | BullMQ + Redis : connexion, file `search`, `createSearchWorker`, `enqueueSearchRun`                                                         | `@fbr/shared` (+ `bullmq`, `ioredis`) |
+| `@fbr/database`         | schéma Drizzle (7 tables), client `postgres.js`, `runMigrations`, repositories typés (searches / combinations / offers / snapshots)         | `@fbr/shared`, `@fbr/config` (dev)    |
 
-### Apps (état Phase 2)
+### Apps (état Phase 3)
 
-| App           | Rôle             | Détail                                                                                                                                  |
-| ------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fbr/api`    | API HTTP Fastify | `buildApp({ config, logger, db? })` → instance Fastify. Route `/health` (ping DB, 200 `ok` / 503 `degraded`). Routes métier en Phase 3. |
-| `@fbr/worker` | Process de fond  | `createWorkerRuntime({ logger })` avec `start()` / `stop()` + heartbeat. Hébergera scheduler + workers BullMQ en Phase 3.               |
+| App           | Rôle             | Détail                                                                                                                                                                  |
+| ------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@fbr/api`    | API HTTP Fastify | `buildApp({ config, logger, db?, queue? })`. `/health` + `/api/searches` (CRUD, activate/pause, run, flights, prices). Controllers fins → repositories + search-engine. |
+| `@fbr/worker` | Process de fond  | Scheduler (scan des recherches dues → `search.run`) + worker BullMQ : `ProviderRegistry` → `normalizer` → `price_snapshots` (append-only) → replanification adaptative. |
 
 `apps/web` (Next.js) est ajouté en **Phase 6**.
 

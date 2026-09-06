@@ -1,29 +1,63 @@
 import { loadConfig } from "@fbr/config";
-import { createLogger } from "@fbr/shared";
-import { createWorkerRuntime } from "./runtime.js";
+import { createDatabase } from "@fbr/database";
+import {
+  createQueueConnection,
+  createSearchQueue,
+  createSearchWorker,
+  type SearchJob,
+} from "@fbr/queue";
+import { createLogger, LogEvent } from "@fbr/shared";
+import { buildProviderRegistry } from "./providers.js";
+import { createScheduler } from "./scheduler.js";
+import { processSearchRun, type SearchProcessorDeps } from "./search-processor.js";
 
 const config = loadConfig();
-const logger = createLogger({
-  name: "worker",
-  level: config.log.level,
-  pretty: config.log.pretty,
+const logger = createLogger({ name: "worker", level: config.log.level, pretty: config.log.pretty });
+
+const db = createDatabase({ url: config.database.url });
+const connection = createQueueConnection(config.redis.url);
+const queue = createSearchQueue(connection);
+const registry = buildProviderRegistry(config, logger);
+
+const processorDeps: SearchProcessorDeps = {
+  db: db.db,
+  registry,
+  logger,
+  combinationsPerRun: config.engine.combinationsPerRun,
+  providerMinIntervalSeconds: config.engine.providerMinIntervalSeconds,
+};
+
+const worker = createSearchWorker((job: SearchJob) => processSearchRun(processorDeps, job.data), {
+  connection,
+  concurrency: config.engine.searchWorkerConcurrency,
+});
+worker.on("failed", (job, err) => {
+  logger.error({ event: "search_job_failed", jobId: job?.id, err }, "job de recherche en échec");
 });
 
-const runtime = createWorkerRuntime({ logger });
-runtime.start();
+const scheduler = createScheduler({
+  db: db.db,
+  queue,
+  logger,
+  intervalMs: config.engine.schedulerIntervalMs,
+});
 
-const shutdown = (signal: string): void => {
-  logger.info({ signal }, "signal d'arrêt reçu");
-  void runtime.stop().then(() => process.exit(0));
+scheduler.start();
+logger.info({ event: LogEvent.AppStarted, env: config.env }, "worker prêt");
+
+let shuttingDown = false;
+const shutdown = async (signal: string): Promise<void> => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ event: LogEvent.AppStopped, signal }, "arrêt du worker");
+  await scheduler.stop();
+  await worker.close();
+  await queue.close();
+  await connection.quit();
+  await db.close();
+  process.exit(0);
 };
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    shutdown(signal);
-  });
+  process.on(signal, () => void shutdown(signal));
 }
-
-// Garde le process vivant tant qu'aucun signal n'est reçu.
-setInterval(() => {
-  /* keep-alive */
-}, 1 << 30);

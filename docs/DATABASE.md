@@ -14,25 +14,29 @@ pnpm db:migrate    # applique les migrations en attente à DATABASE_URL (idempot
 pnpm --filter @fbr/database db:studio   # explorateur Drizzle
 ```
 
-## État du schéma — Phase 1
+## État du schéma — Phase 3
 
-Une seule table technique pour valider la chaîne connexion → migration → client typé :
+`0000` : `app_meta` (table technique de bout-en-bout).
+`0001` : moteur de recherche + seed de l'utilisateur de dev (`00000000-…-0001` / `dev@localhost`).
 
-### `app_meta`
+| Table                      | Rôle                                                                                                              | Points clés                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `users`                    | Utilisateur (auth réelle en Phase 6)                                                                              | `email` unique                                                                                                |
+| `searches`                 | Recherche sauvegardée : origine, destinations[], cabine, fenêtre de dates, durée min/max, budget/cible (centimes) | `status` (ACTIVE/PAUSED/ARCHIVED), `priority`, `interval_seconds`, `next_run_at`                              |
+| `search_date_combinations` | Couples (départ, retour) matérialisés et priorisés pour une recherche                                             | unique `(search_id, outbound_date, return_date)`, `priority_score`, `last_checked_at`                         |
+| `flight_offers`            | Identité normalisée d'une offre + `payload` JSON complet                                                          | `fingerprint` unique (dédup / clé de l'historique)                                                            |
+| `offer_provider_links`     | Une offre vue par plusieurs providers (URL de réservation)                                                        | unique `(flight_offer_id, provider)`                                                                          |
+| **`price_snapshots`**      | **Append-only** : une ligne par observation de prix                                                               | `bigserial` id, index `(flight_offer_id, observed_at)` et `(search_id, observed_at)` ; jamais d'UPDATE/DELETE |
 
-| Colonne      | Type          | Notes          |
-| ------------ | ------------- | -------------- |
-| `key`        | `text`        | PK             |
-| `value`      | `text`        | non nul        |
-| `updated_at` | `timestamptz` | défaut `now()` |
+**Argent** : colonnes `*_cents` en `integer` (exact, jamais de flottant). **Temps** : `timestamptz` UTC.
+`price_snapshots.price_eur_cents` + partitionnement mensuel : ajoutés en **Phase 4** (avec le FX).
 
-## Tables à venir (cf. PHASE-0-DISCOVERY.md §5)
+## Tables à venir
 
-| Phase | Tables                                                                                        |
-| ----- | --------------------------------------------------------------------------------------------- |
-| 3     | `users`, `searches`, `search_date_combinations`, `airports`, `airlines`                       |
-| 3–4   | `flight_offers`, `offer_provider_links`, `price_snapshots` (append-only, partition mensuelle) |
-| 4     | `price_events`, `fx_rates`, `provider_requests`                                               |
-| 5     | `alerts`, `notifications` (avec `dedupe_key` anti-spam)                                       |
+| Phase | Tables                                                                        |
+| ----- | ----------------------------------------------------------------------------- |
+| 4     | `price_events`, `fx_rates`, `provider_requests` ; partition `price_snapshots` |
+| 5     | `alerts`, `notifications` (avec `dedupe_key` anti-spam)                       |
+| 9     | `airports`, `airlines` (référentiels pour le mode Radar)                      |
 
-Chaque phase ajoute ses tables dans `packages/database/src/schema/` + une migration dédiée. Aucune migration existante n'est éditée après coup.
+Chaque phase ajoute ses tables dans `packages/database/src/schema/*.table.ts` + une migration dédiée. Aucune migration appliquée n'est éditée après coup.

@@ -46,7 +46,9 @@ pnpm db:migrate
 - **Logs** : `createLogger({ name })` + `logger.info({ event: LogEvent.X, ... }, "msg")`. Aucun secret dans les logs (redaction en place, mais rester vigilant).
 - **Erreurs** : lever une sous-classe d'`AppError` avec un `code` et `retryable` correct.
 - **Argent** : `@fbr/shared` `toCents` / `fromCents` ; ne jamais additionner des nombres flottants de prix.
-- **Tests** : `*.test.ts` co-localisés ; pas de dépendance à un service réseau pour les tests unitaires (les tests d'intégration DB/Redis avec Testcontainers arrivent en Phase 3).
+- **Tests** : deux projets Vitest.
+  - `*.test.ts` (unit) : co-localisés, aucune dépendance réseau, exécutés en parallèle.
+  - `*.int.test.ts` (integration) : Postgres + Redis, exécutés **en série** (base partagée + verrou consultatif). Ils se **skippent** automatiquement si `DATABASE_URL` / `REDIS_URL` sont absents ; sinon `docker compose up -d` suffit (le `.env` est chargé automatiquement).
 
 ## Git
 

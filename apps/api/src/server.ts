@@ -1,5 +1,6 @@
 import { loadConfig } from "@fbr/config";
 import { createDatabase } from "@fbr/database";
+import { createQueueConnection, createSearchQueue } from "@fbr/queue";
 import { createLogger, LogEvent } from "@fbr/shared";
 import { buildApp } from "./app.js";
 
@@ -11,11 +12,15 @@ const logger = createLogger({
 });
 
 const db = createDatabase({ url: config.database.url });
-const app = buildApp({ config, logger, db });
+const connection = createQueueConnection(config.redis.url);
+const queue = createSearchQueue(connection);
+const app = buildApp({ config, logger, db, queue });
 
 const shutdown = async (signal: string): Promise<void> => {
   logger.info({ event: LogEvent.AppStopped, signal }, "arrêt de l'api");
   await app.close();
+  await queue.close();
+  await connection.quit();
   await db.close();
   process.exit(0);
 };
