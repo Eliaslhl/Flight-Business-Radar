@@ -12,7 +12,7 @@
 - **Config centralisée** : pas de `process.env` hors de `@fbr/config`.
 - **Logs structurés** : toujours via `@fbr/shared` `createLogger`, avec un `event` nommé (`LogEvent`).
 
-## Packages (état Phase 5)
+## Packages (état Phase 6 — inchangés depuis la Phase 5)
 
 | Package                 | Rôle                                                                                                                                                         | Dépend de                             |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
@@ -29,14 +29,13 @@
 | `@fbr/queue`            | BullMQ + Redis : connexion, file `search`, `createSearchWorker`, `enqueueSearchRun`                                                                          | `@fbr/shared` (+ `bullmq`, `ioredis`) |
 | `@fbr/database`         | schéma Drizzle (11 tables), client `postgres.js`, `runMigrations`, repositories typés (searches / offers / snapshots / events / fx / alerts / notifications) | `@fbr/shared`, `@fbr/config` (dev)    |
 
-### Apps (état Phase 5)
+### Apps (état Phase 6)
 
-| App           | Rôle             | Détail                                                                                                                                                                                                      |
-| ------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fbr/api`    | API HTTP Fastify | `/health` + `/api/searches` (CRUD, run, flights, prices, analytics, events, **notifications**) + `/api/alerts` (CRUD). Controllers fins.                                                                    |
-| `@fbr/worker` | Process de fond  | Scheduler + worker BullMQ : providers → normalizer → `price_snapshots` (append-only, FX) → `analyzeOffers` → **`runAlertPipeline`** (cooldown → dédup → **confirmation** → notification) → replanification. |
-
-`apps/web` (Next.js) est ajouté en **Phase 6**.
+| App           | Rôle              | Détail                                                                                                                                                                                                            |
+| ------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@fbr/api`    | API HTTP Fastify  | `/health` + `/api/searches` (CRUD, run, flights, prices, analytics, events, notifications) + `/api/alerts` (CRUD). Controllers fins.                                                                              |
+| `@fbr/worker` | Process de fond   | Scheduler + worker BullMQ : providers → normalizer → `price_snapshots` (append-only, FX) → `analyzeOffers` → `runAlertPipeline` (cooldown → dédup → confirmation → notification) → replanification.               |
+| `@fbr/web`    | Dashboard Next.js | App Router + TanStack Query + Recharts. **Découplé par HTTP** (aucun import `@fbr/*`) ; `next.config` proxie `/api/*` → API (pas de CORS). Pages : dashboard, recherches, détail (graphiques), alertes, réglages. |
 
 ## Résolution des packages
 

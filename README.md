@@ -14,8 +14,8 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 | 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                 | ✅ Terminée  |
 | 4     | Price history : snapshots, statistiques, tendances, détection d'événements, FX             | ✅ Terminée  |
 | 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation             | ✅ Terminée  |
-| 6     | Frontend : dashboard Next.js, graphiques, alertes                                          | 🟢 Prochaine |
-| 7     | Real providers : SerpApi puis Duffel                                                       | ⏳           |
+| 6     | Frontend : dashboard Next.js, graphiques, alertes                                          | ✅ Terminée  |
+| 7     | Real providers : SerpApi puis Duffel                                                       | 🟢 Prochaine |
 | 8     | Notifications : email, Telegram, push                                                      | ⏳           |
 | 9     | Smart recommendations : opportunity score, dates, Radar                                    | ⏳           |
 | 10    | AI Advisor                                                                                 | ⏳           |
@@ -42,9 +42,10 @@ pnpm typecheck && pnpm lint && pnpm test
 # Migrations
 pnpm db:migrate
 
-# Lancer l'API (http://localhost:3001/health) et le worker
-pnpm --filter @fbr/api dev
+# Lancer l'API, le worker et le dashboard
+pnpm --filter @fbr/api dev      # http://localhost:3001/health
 pnpm --filter @fbr/worker dev
+pnpm --filter @fbr/web dev      # http://localhost:3000  (proxy /api → API)
 ```
 
 ## Structure
@@ -52,7 +53,8 @@ pnpm --filter @fbr/worker dev
 ```
 apps/
   api/       Fastify — API REST (+ /health)
-  worker/    Process de fond (scheduler + workers BullMQ à partir de la Phase 3)
+  worker/    Process de fond : scheduler + workers BullMQ + analyse + alertes
+  web/       Next.js 15 — dashboard (TanStack Query, Recharts), proxy /api → API
 packages/
   shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
   config/           chargement + validation d'environnement (Zod, fail-fast)
@@ -66,7 +68,7 @@ packages/
   notifications/    NotificationChannel + ConsoleChannel + NotificationService
   queue/            BullMQ + Redis (file `search`, worker)
   database/         schéma Drizzle + client postgres.js + migrations + repositories
-docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, NOTIFICATIONS, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
+docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
 ```
 
 ## Scripts racine

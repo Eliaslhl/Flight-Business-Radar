@@ -1,0 +1,11 @@
+export const qk = {
+  health: ["health"] as const,
+  searches: ["searches"] as const,
+  search: (id: string) => ["searches", id] as const,
+  flights: (id: string) => ["searches", id, "flights"] as const,
+  prices: (id: string) => ["searches", id, "prices"] as const,
+  analytics: (id: string) => ["searches", id, "analytics"] as const,
+  events: (id: string) => ["searches", id, "events"] as const,
+  notifications: (id: string) => ["searches", id, "notifications"] as const,
+  alerts: (searchId?: string) => ["alerts", searchId ?? "all"] as const,
+};

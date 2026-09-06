@@ -19,8 +19,8 @@ export default defineWorkspace([
     resolve,
     test: {
       name: "unit",
-      include: ["packages/*/src/**/*.{test,spec}.ts", "apps/*/src/**/*.{test,spec}.ts"],
-      exclude: ["**/*.int.test.ts", "**/node_modules/**", "**/dist/**"],
+      include: ["packages/*/src/**/*.{test,spec}.ts", "apps/*/src/**/*.{test,spec}.{ts,tsx}"],
+      exclude: ["**/*.int.test.ts", "**/node_modules/**", "**/dist/**", "**/.next/**"],
       environment: "node",
       clearMocks: true,
       coverage: {

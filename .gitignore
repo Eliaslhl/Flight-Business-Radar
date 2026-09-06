@@ -6,6 +6,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Next.js (next-env.d.ts is committed so `tsc` is self-contained; the
+# `.next/types` reference line that `next build` appends is not committed)
+.next/
+
 # Test / coverage
 coverage/
 .vitest/
