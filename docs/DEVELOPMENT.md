@@ -19,6 +19,7 @@ pnpm db:migrate
 | Tests d'un seul package     | `pnpm --filter @fbr/shared test`                                              |
 | API en dev (reload)         | `pnpm --filter @fbr/api dev` → `GET http://localhost:3001/health`             |
 | Worker en dev               | `pnpm --filter @fbr/worker dev`                                               |
+| Dashboard en dev            | `pnpm --filter @fbr/web dev` → `http://localhost:3000`                        |
 | Corriger le formatage       | `pnpm format`                                                                 |
 | Corriger le lint            | `pnpm lint:fix`                                                               |
 
