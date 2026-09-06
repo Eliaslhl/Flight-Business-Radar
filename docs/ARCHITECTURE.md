@@ -12,15 +12,18 @@
 - **Config centralisée** : pas de `process.env` hors de `@fbr/config`.
 - **Logs structurés** : toujours via `@fbr/shared` `createLogger`, avec un `event` nommé (`LogEvent`).
 
-## Packages (état Phase 1)
+## Packages (état Phase 2)
 
-| Package         | Rôle                                                                                                                                          | Dépend de                          |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `@fbr/shared`   | logger pino (redaction secrets), hiérarchie d'erreurs (`AppError` + `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent` | —                                  |
-| `@fbr/config`   | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                              | `@fbr/shared`                      |
-| `@fbr/database` | schéma Drizzle, client `postgres.js` (`createDatabase`), `pingDatabase`, runner de migrations                                                 | `@fbr/shared`, `@fbr/config` (dev) |
+| Package                 | Rôle                                                                                                                                          | Dépend de                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `@fbr/shared`           | logger pino (redaction secrets), hiérarchie d'erreurs (`AppError` + `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent` | —                                   |
+| `@fbr/config`           | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                              | `@fbr/shared`                       |
+| `@fbr/flight-domain`    | modèle métier pur : `FlightSearchRequest`, `FlightOffer` (+ schémas Zod), value objects IATA/dates/devise/cabine, `computeFingerprint`        | `@fbr/shared`                       |
+| `@fbr/flight-providers` | interface `FlightProvider`, `ProviderRegistry` (exécution parallèle isolée), `MockFlightProvider` (7 scénarios déterministes)                 | `@fbr/flight-domain`, `@fbr/shared` |
+| `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication par empreinte (`dedupeOffers`), orchestration (`normalizeSearchResults`)                    | `@fbr/flight-domain`, `@fbr/shared` |
+| `@fbr/database`         | schéma Drizzle, client `postgres.js` (`createDatabase`), `pingDatabase`, runner de migrations                                                 | `@fbr/shared`, `@fbr/config` (dev)  |
 
-### Apps (état Phase 1)
+### Apps (état Phase 2)
 
 | App           | Rôle             | Détail                                                                                                                                  |
 | ------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,9 +40,10 @@ Chaque `package.json` expose une condition `development` pointant vers `src/inde
 "exports": { ".": { "development": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" } }
 ```
 
-- **Vitest** utilise la condition `development` (voir `vitest.workspace.ts`) → pas besoin de builder avant de tester.
-- **Production / `node dist`** utilise `default` → `dist/*.js` (build `tsc -b`, ordonné par Turborepo via `^build`).
-- **Typecheck** s'appuie sur les project references TypeScript (`tsconfig.json` racine).
+- `customConditions: ["development"]` (base tsconfig) fait résoudre `@fbr/*` vers `src/` pour **tsc** et **typescript-eslint** → pas besoin de builder avant de typechecker/tester.
+- **Vitest** ajoute la même condition `development` (voir `vitest.workspace.ts`).
+- **Production / `node dist`** : Node ignore la condition `development` → `default` → `dist/*.js` (build `tsc -p tsconfig.build.json` par package, ordonné par Turborepo via `^build`).
+- Chaque package a deux tsconfig : `tsconfig.json` (lint/typecheck, inclut les tests) et `tsconfig.build.json` (émission, exclut les tests).
 
 ## Flux cible (rappel)
 
