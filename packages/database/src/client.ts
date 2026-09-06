@@ -1,4 +1,7 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres, { type Sql } from "postgres";
 import * as schema from "./schema/index.js";
 
@@ -41,3 +44,12 @@ export const pingDatabase = async (handle: DbHandle): Promise<boolean> => {
   const rows = await handle.sql<{ ok: number }[]>`SELECT 1 AS ok`;
   return rows[0]?.ok === 1;
 };
+
+/** Dossier des migrations SQL, résolu depuis ce package (fonctionne en `src` comme en `dist`). */
+export const MIGRATIONS_FOLDER = resolve(dirname(fileURLToPath(import.meta.url)), "../drizzle");
+
+/** Applique les migrations en attente (idempotent). */
+export const runMigrations = (
+  handle: DbHandle,
+  migrationsFolder: string = MIGRATIONS_FOLDER,
+): Promise<void> => migrate(handle.db, { migrationsFolder });

@@ -47,4 +47,27 @@ describe("loadConfig", () => {
   it("rejette un NODE_ENV inconnu", () => {
     expect(() => loadConfig({ ...baseEnv, NODE_ENV: "staging" })).toThrow(ConfigError);
   });
+
+  it("traite un secret vide dans .env comme non défini", () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      SERPAPI_API_KEY: "",
+      DUFFEL_API_TOKEN: "",
+      TELEGRAM_BOT_TOKEN: "",
+    });
+    expect(cfg.providers.serpapi).toBeNull();
+    expect(cfg.providers.duffel).toBeNull();
+    expect(cfg.notifications.telegram).toBeNull();
+  });
+
+  it("expose la config du moteur de recherche avec ses défauts", () => {
+    const cfg = loadConfig({ ...baseEnv });
+    expect(cfg.engine).toEqual({
+      schedulerIntervalMs: 15_000,
+      searchWorkerConcurrency: 4,
+      combinationsPerRun: 6,
+      providerMinIntervalSeconds: 60,
+      mockScenario: "normal",
+    });
+  });
 });

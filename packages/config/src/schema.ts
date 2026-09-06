@@ -10,6 +10,12 @@ const nodeEnv = z.enum(["development", "test", "production"]).default("developme
 const logLevel = z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info");
 const boolish = z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1");
 const port = z.coerce.number().int().positive().max(65535);
+const posInt = z.coerce.number().int().positive();
+/** Secret optionnel : une chaîne vide dans `.env` est traitée comme « non défini ». */
+const optionalSecret = z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().min(1).optional(),
+);
 
 export const configSchema = z
   .object({
@@ -29,12 +35,30 @@ export const configSchema = z
       .default("EUR"),
     FX_SOURCE: z.enum(["frankfurter", "ecb", "fixed"]).default("frankfurter"),
 
+    // Moteur de recherche / surveillance (Phase 3).
+    SCHEDULER_INTERVAL_MS: posInt.default(15_000),
+    SEARCH_WORKER_CONCURRENCY: posInt.default(4),
+    SEARCH_COMBINATIONS_PER_RUN: posInt.default(6),
+    PROVIDER_MIN_INTERVAL_SECONDS: posInt.default(60),
+    // Scénario du MockFlightProvider tant qu'aucun provider réel n'est branché (Phase 7).
+    MOCK_SCENARIO: z
+      .enum([
+        "normal",
+        "gradual-drop",
+        "flash-drop",
+        "record-low",
+        "unavailable",
+        "error",
+        "timeout",
+      ])
+      .default("normal"),
+
     // Providers — optionnels tant que non activés (Phase 7+).
-    SERPAPI_API_KEY: z.string().min(1).optional(),
-    DUFFEL_API_TOKEN: z.string().min(1).optional(),
+    SERPAPI_API_KEY: optionalSecret,
+    DUFFEL_API_TOKEN: optionalSecret,
 
     // Notifications — optionnel (Phase 8+).
-    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+    TELEGRAM_BOT_TOKEN: optionalSecret,
   })
   .transform((raw) => ({
     env: raw.NODE_ENV,
@@ -57,6 +81,13 @@ export const configSchema = z
     currency: {
       base: raw.BASE_CURRENCY,
       fxSource: raw.FX_SOURCE,
+    },
+    engine: {
+      schedulerIntervalMs: raw.SCHEDULER_INTERVAL_MS,
+      searchWorkerConcurrency: raw.SEARCH_WORKER_CONCURRENCY,
+      combinationsPerRun: raw.SEARCH_COMBINATIONS_PER_RUN,
+      providerMinIntervalSeconds: raw.PROVIDER_MIN_INTERVAL_SECONDS,
+      mockScenario: raw.MOCK_SCENARIO,
     },
     providers: {
       serpapi: raw.SERPAPI_API_KEY ? { apiKey: raw.SERPAPI_API_KEY } : null,

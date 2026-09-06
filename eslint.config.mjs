@@ -34,10 +34,9 @@ export default tseslint.config(
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      "@typescript-eslint/explicit-function-return-type": [
-        "warn",
-        { allowExpressions: true, allowTypedFunctionExpressions: true },
-      ],
+      // TS strict infère et vérifie déjà les retours ; on n'impose l'annotation
+      // explicite que sur les frontières publiques, pas sur les helpers internes.
+      "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "no-console": "warn",

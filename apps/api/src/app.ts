@@ -1,17 +1,20 @@
-import { type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { type AppConfig } from "@fbr/config";
-import { LogEvent, type Logger } from "@fbr/shared";
+import { AppError, LogEvent, type Logger } from "@fbr/shared";
 import { pingDatabase, type DbHandle } from "@fbr/database";
-import Fastify, { type FastifyInstance } from "fastify";
+import { type Queue, type SearchRunJobData } from "@fbr/queue";
+import Fastify, { type FastifyError } from "fastify";
+import { registerSearchRoutes } from "./routes/searches.js";
+import { type ApiInstance } from "./types.js";
 
-/** Instance Fastify paramétrée avec le logger pino de `@fbr/shared`. */
-export type ApiInstance = FastifyInstance<Server, IncomingMessage, ServerResponse, Logger>;
+export { type ApiInstance } from "./types.js";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
   readonly logger: Logger;
-  /** Handle DB optionnel — si absent, le healthcheck reporte `database: "skipped"`. */
+  /** Handle DB — requis pour exposer les routes `/api/*`. Sans lui, seul `/health` est servi. */
   readonly db?: DbHandle;
+  /** File `search` — requise pour `POST /api/searches/:id/run`. */
+  readonly queue?: Queue<SearchRunJobData>;
 }
 
 interface HealthReport {
@@ -25,11 +28,11 @@ interface HealthReport {
 }
 
 /**
- * Construit l'instance Fastify. Aucune logique métier ici (Phase 0 §21) —
- * seulement le socle HTTP + le healthcheck. Les routes `/api/*` arrivent en Phase 3.
+ * Construit l'instance Fastify. Les controllers restent fins (Phase 0 §21) :
+ * ils délèguent aux repositories `@fbr/database` et au moteur `@fbr/search-engine`.
  */
 export const buildApp = (options: BuildAppOptions): ApiInstance => {
-  const { config, logger, db } = options;
+  const { config, logger, db, queue } = options;
 
   const app = Fastify({
     loggerInstance: logger,
@@ -56,8 +59,24 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
     return reply.code(report.status === "ok" ? 200 : 503).send(report);
   });
 
+  if (db) {
+    registerSearchRoutes(app, { db: db.db, ...(queue ? { queue } : {}), logger });
+  }
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error instanceof AppError) {
+      logger.warn({ err: error.toLogObject(), url: request.url }, "erreur applicative");
+      return reply.code(400).send({ error: error.code, message: error.message });
+    }
+    logger.error({ err: error, url: request.url }, "erreur non gérée");
+    return reply.code(error.statusCode ?? 500).send({ error: "INTERNAL" });
+  });
+
   app.addHook("onReady", async () => {
-    logger.info({ event: LogEvent.AppStarted, env: config.env }, "api ready");
+    logger.info(
+      { event: LogEvent.AppStarted, env: config.env, routes: db ? "full" : "health-only" },
+      "api ready",
+    );
     await Promise.resolve();
   });
 

@@ -16,9 +16,15 @@
   "dependencies": {
     "@fbr/config": "workspace:*",
     "@fbr/database": "workspace:*",
+    "@fbr/flight-domain": "workspace:*",
+    "@fbr/flight-providers": "workspace:*",
+    "@fbr/normalizer": "workspace:*",
+    "@fbr/queue": "workspace:*",
+    "@fbr/search-engine": "workspace:*",
     "@fbr/shared": "workspace:*"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
     "tsx": "^4.19.2"
   }
 }
