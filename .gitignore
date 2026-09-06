@@ -37,3 +37,8 @@ pnpm-debug.log*
 
 # Drizzle local artifacts
 packages/database/drizzle/meta/_journal.lock
+
+# Python (services/flight-scraper)
+.venv/
+__pycache__/
+*.pyc

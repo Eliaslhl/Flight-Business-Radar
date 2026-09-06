@@ -5,6 +5,7 @@ import {
   listNotificationsForSearch,
   listObservationsForAnalytics,
   listPriceEventsForSearch,
+  listProviderRequests,
   listSearches,
   listSearchFlights,
   listSnapshotsForSearch,
@@ -232,6 +233,31 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
         createdAt: n.createdAt.toISOString(),
         sentAt: n.sentAt?.toISOString() ?? null,
         error: n.error,
+      })),
+    };
+  });
+
+  app.get("/api/searches/:id/provider-requests", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const query = request.query as { limit?: string; provider?: string };
+    const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
+    const rows = await listProviderRequests(db, {
+      searchId: id,
+      limit,
+      ...(query.provider ? { provider: query.provider } : {}),
+    });
+    return {
+      providerRequests: rows.map((r) => ({
+        id: r.id,
+        provider: r.provider,
+        ok: r.ok,
+        offerCount: r.offerCount,
+        latencyMs: r.latencyMs,
+        errorCode: r.errorCode,
+        errorMessage: r.errorMessage,
+        createdAt: r.createdAt.toISOString(),
       })),
     };
   });

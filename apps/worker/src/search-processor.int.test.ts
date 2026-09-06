@@ -6,6 +6,7 @@ import {
   getSearch,
   listNotificationsForSearch,
   listPriceEventsForSearch,
+  listProviderRequests,
   listSnapshotsForSearch,
   type DbHandle,
 } from "@fbr/database";
@@ -213,6 +214,27 @@ suite("processSearchRun (intégration Postgres)", () => {
     });
     expect(summary.providerErrors).toBeGreaterThan(0);
     expect(summary.snapshotsInserted).toBeGreaterThan(0);
+  });
+
+  it("journalise chaque appel provider dans provider_requests (succès et échec)", async () => {
+    const search = await makeSearch();
+    const registry = new ProviderRegistry([
+      new MockFlightProvider({ name: "ok", scenario: "normal" }),
+      new MockFlightProvider({ name: "ko", scenario: "error" }),
+    ]);
+    await processSearchRun(deps(registry, 2), { searchId: search.id, reason: "manual" });
+
+    const rows = await listProviderRequests(handle.db, { searchId: search.id });
+    // 2 combinaisons × 2 providers
+    expect(rows).toHaveLength(4);
+    expect(rows.every((r) => r.searchId === search.id)).toBe(true);
+
+    const ok = rows.filter((r) => r.provider === "ok");
+    const ko = rows.filter((r) => r.provider === "ko");
+    expect(ok).toHaveLength(2);
+    expect(ok.every((r) => r.ok && r.offerCount > 0 && r.errorCode === null)).toBe(true);
+    expect(ko).toHaveLength(2);
+    expect(ko.every((r) => !r.ok && r.offerCount === 0 && r.errorCode !== null)).toBe(true);
   });
 
   /** Un provider flash-drop **partagé** : son compteur d'appels fait évoluer le prix. */

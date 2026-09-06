@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@fbr/flight-domain": "workspace:*",
-    "@fbr/shared": "workspace:*"
+    "@fbr/shared": "workspace:*",
+    "zod": "^3.24.1"
   }
 }

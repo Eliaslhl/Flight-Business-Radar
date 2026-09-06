@@ -50,9 +50,9 @@ L'API (`POST /api/searches/:id/run`) peut enfiler un job `reason: "manual"` imm�
 1. charge la recherche ; ignore un job `scheduled` si `status !== ACTIVE` ;
 2. génère les combinaisons de dates si absentes (`generateDateCombinations`) ;
 3. sélectionne les `combinationsPerRun` combinaisons prioritaires (`pickCombinations` : jamais vérifiées d'abord, puis score) ;
-4. pour chaque combinaison : `buildRequestForCombination` → `registry.searchAll` → `normalizeSearchResults` ;
+4. pour chaque combinaison : `buildRequestForCombination` → `registry.searchAll` → `normalizeSearchResults` ; chaque `outcome` (succès **ou** échec) est bufferisé pour `provider_requests` ;
 5. `upsertOffer` + `upsertProviderLink` + **INSERT** `price_snapshots` (jamais d'écrasement), avec `price_eur_cents` normalisé par `FxService` (`@fbr/fx`) ;
-6. `markCombinationsChecked` ;
+6. `insertProviderRequests` (journal d'observabilité : `provider, ok, offer_count, latency_ms, error_code/message`) puis `markCombinationsChecked` ;
 7. **passe `analyze`** (`analyzeOffers`, Phase 4) : par offre touchée, `derivePriceEvents` (`@fbr/analytics`) → INSERT `price_events` + résolution des baisses ouvertes revenues ;
 8. **pipeline d'alerte** (`runAlertPipeline`, Phase 5) : `matchAlerts` → cooldown → dédup (`dedupe_key`) → **confirmation** des prix exceptionnels (re-requête via `@fbr/fx`) → `NotificationService.dispatch` → lignes `notifications` ; voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md) ;
 9. `computeNextIntervalSeconds` (palier COLD/NORMAL/WARM/HOT/VERIFY + plancher provider + jitter) et `computeSearchPriority` → `updateSearchSchedule`.
@@ -73,13 +73,15 @@ Départ imminent (`daysUntilDeparture ≤ 10`) → resserre d'un cran. Jitter ±
 
 ## Configuration (`.env`)
 
-| Variable                                                                      | Défaut                 | Rôle                                          |
-| ----------------------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
-| `SCHEDULER_INTERVAL_MS`                                                       | 15000                  | Période de scan des recherches dues           |
-| `SEARCH_WORKER_CONCURRENCY`                                                   | 4                      | Jobs `search.run` traités en parallèle        |
-| `SEARCH_COMBINATIONS_PER_RUN`                                                 | 6                      | Combinaisons sondées par exécution            |
-| `PROVIDER_MIN_INTERVAL_SECONDS`                                               | 60                     | Plancher d'intervalle (rate limit provider)   |
-| `MOCK_SCENARIO`                                                               | normal                 | Scénario du provider simulé (Phase 7 → réels) |
-| `FX_SOURCE` / `FX_FIXED_RATES`                                                | frankfurter            | Source des taux de change / taux fixes JSON   |
-| `DROP_PCT` / `FLASH_DROP_PCT` / `FLASH_DROP_ABS_EUR` / `FLASH_WINDOW_MINUTES` | 0.05 / 0.12 / 120 / 90 | Seuils de détection de baisse                 |
-| `ANALYTICS_MIN_SAMPLE`                                                        | 30                     | Échantillon minimal (`UNUSUAL`, fiabilité)    |
+| Variable                                                                      | Défaut                 | Rôle                                                                    |
+| ----------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| `SCHEDULER_INTERVAL_MS`                                                       | 15000                  | Période de scan des recherches dues                                     |
+| `SEARCH_WORKER_CONCURRENCY`                                                   | 4                      | Jobs `search.run` traités en parallèle                                  |
+| `SEARCH_COMBINATIONS_PER_RUN`                                                 | 6                      | Combinaisons sondées par exécution                                      |
+| `PROVIDER_MIN_INTERVAL_SECONDS`                                               | 60                     | Plancher d'intervalle (rate limit provider)                             |
+| `MOCK_SCENARIO`                                                               | normal                 | Scénario du `MockFlightProvider` (si `FAST_FLIGHTS_URL` absent)         |
+| `FAST_FLIGHTS_URL`                                                            | _(vide)_               | URL du sidecar `services/flight-scraper` → active `FastFlightsProvider` |
+| `FAST_FLIGHTS_TIMEOUT_MS`                                                     | 20000                  | Timeout par appel au sidecar                                            |
+| `FX_SOURCE` / `FX_FIXED_RATES`                                                | frankfurter            | Source des taux de change / taux fixes JSON                             |
+| `DROP_PCT` / `FLASH_DROP_PCT` / `FLASH_DROP_ABS_EUR` / `FLASH_WINDOW_MINUTES` | 0.05 / 0.12 / 120 / 90 | Seuils de détection de baisse                                           |
+| `ANALYTICS_MIN_SAMPLE`                                                        | 30                     | Échantillon minimal (`UNUSUAL`, fiabilité)                              |

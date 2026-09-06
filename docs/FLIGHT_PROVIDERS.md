@@ -34,11 +34,90 @@ La déduplication inter-providers est faite ensuite par `@fbr/normalizer`.
 
 ## Providers implémentés
 
-| Provider               | Statut     | Notes                                                         |
-| ---------------------- | ---------- | ------------------------------------------------------------- |
-| `MockFlightProvider`   | ✅ Phase 2 | Provider de test déterministe. Aucune I/O.                    |
-| SerpApi Google Flights | ⏳ Phase 7 | 1er provider réel (documenté, Business, `travel_class=3`).    |
-| Duffel                 | ⏳ Phase 7 | Oracle de confirmation des flash drops + lien de réservation. |
+| Provider                | Statut         | Notes                                                                                                                            |
+| ----------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `MockFlightProvider`    | ✅ Phase 2     | Provider de test déterministe. Aucune I/O.                                                                                       |
+| `FixtureFlightProvider` | ✅ Phase 7     | Rejoue des `FlightOffer` canoniques (tests, CI, démo hors-ligne). Aucune I/O.                                                    |
+| `FastFlightsProvider`   | ✅ Phase 7     | Client HTTP du sidecar `services/flight-scraper` (Google Flights via `fast-flights`). Actif quand `FAST_FLIGHTS_URL` est défini. |
+| SerpApi Google Flights  | ⏳ (au besoin) | Provider réel payant. Documenté §43 ; à brancher ici sans toucher au pipeline.                                                   |
+| Duffel                  | ⏳ (au besoin) | Oracle de confirmation des flash drops + lien de réservation.                                                                    |
+
+## `FastFlightsProvider` + sidecar `services/flight-scraper` (Phase 7)
+
+Choix Phase 7 : **surveillance réelle, gratuite, 100 % locale**. Le scraper Google Flights
+(`fast-flights`, OSS) est isolé dans un **sidecar Python** (FastAPI) — application du principe
+Phase 0 §43 : « un scraper fragile est isolé derrière une interface, toujours avec un
+fallback, et le produit ne dépend jamais entièrement de lui ».
+
+### Contrat HTTP
+
+`POST /search` (JSON) → `SearchResponse` :
+
+```jsonc
+{
+  "provider": "fast-flights",
+  "mode": "fixture" | "live",
+  "degraded": false,           // true => aucune offre exploitable, voir "error"
+  "currency": "EUR",
+  "fetchedAt": "2026-09-06T17:57:27Z",
+  "offers": [ /* Offer[] : priceCents, outbound/inbound Leg, totalStops, isBest, bookingUrl */ ],
+  "error": null                // string quand degraded
+}
+```
+
+Le sidecar renvoie **toujours HTTP 200**, même en échec (`degraded: true, offers: []`).
+`GET /health` → `{ "status": "ok", "mode": ... }`.
+
+### Modes
+
+| Mode      | Défaut | Comportement                                                                                                                                                                                                                                                                                                        |
+| --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fixture` | ✅     | Sert `services/flight-scraper/fixtures/<ORIGIN>-<DEST>.json` (ou `default.json`), dates recalées sur la requête, jitter déterministe par tranche de 10 min. **Toujours fonctionnel** — c'est le chemin fiable.                                                                                                      |
+| `live`    |        | Best-effort : appelle `fast_flights.get_flights(...)`. **Aujourd'hui non fonctionnel** (voir Risque ci-dessous) → renvoie `degraded: true, offers: []`. À réactiver sans changement de code le jour où l'upstream refonctionne, ou en pointant `FAST_FLIGHTS_URL` vers un autre backend respectant le même contrat. |
+
+Sélection : variable d'environnement `FLIGHT_SCRAPER_MODE` du sidecar (défaut `fixture`).
+
+### Risque connu (`live`)
+
+`fast-flights` en fetch direct/gratuit est **cassé** à ce jour : Google ne renvoie plus le
+blob `<script>` attendu → `AttributeError: 'NoneType' object has no attribute 'text'` dans
+`parser.parse`. Les chemins qui marchent exigent une intégration payante (BrightData /
+SearchApi). Le sidecar dégrade proprement ; le produit continue de tourner sur `fixture` et
+sur les autres providers du `ProviderRegistry`.
+
+### Côté Node — `FastFlightsProvider`
+
+`packages/flight-providers/src/fast-flights-provider.ts` :
+
+- lit `FAST_FLIGHTS_URL` / `FAST_FLIGHTS_TIMEOUT_MS` (via `@fbr/config`) ; sans URL, le worker
+  reste sur `MockFlightProvider`.
+- valide la réponse du sidecar avec un schéma Zod (`scraper-contract.ts`) — payload invalide
+  ⇒ `ProviderError` non-retryable.
+- `degraded: true` ⇒ `[]` (aucune erreur levée, l'`outcome` reste `ok`).
+- HTTP 5xx ⇒ `ProviderError` retryable ; timeout / erreur réseau ⇒ `PROVIDER_TIMEOUT` retryable.
+- synthétise les horaires manquants (`durationMinutes` défaut 600) et résout le code IATA
+  compagnie depuis le nom via `airline-codes.ts` (~55 alias, fallback `XX`).
+- recherche **Radar** (sans destination) non supportée ⇒ `ProviderError` non-retryable.
+
+### Lancer le sidecar
+
+```bash
+# Docker (profil dédié, ne démarre pas avec le stack par défaut)
+docker compose --profile scraper up -d flight-scraper      # http://localhost:8000
+
+# ou en local
+cd services/flight-scraper && python3 -m venv .venv \
+  && .venv/bin/pip install -r requirements.txt \
+  && FLIGHT_SCRAPER_MODE=fixture .venv/bin/uvicorn main:app --port 8000
+```
+
+Puis dans `.env` : `FAST_FLIGHTS_URL=http://localhost:8000`.
+
+### Observabilité — `provider_requests`
+
+Chaque appel provider (succès **ou** échec) est journalisé en base par le worker :
+table `provider_requests` (`provider, search_id, ok, offer_count, latency_ms, error_code,
+error_message, created_at`). Exposé via `GET /api/searches/:id/provider-requests`.
 
 ## `MockFlightProvider` — scénarios
 

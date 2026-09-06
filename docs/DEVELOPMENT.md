@@ -12,16 +12,17 @@ pnpm db:migrate
 
 ## Boucle de travail
 
-| Besoin                      | Commande                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| Tout vérifier (comme la CI) | `pnpm typecheck && pnpm lint && pnpm format:check && pnpm build && pnpm test` |
-| Tests en watch              | `pnpm test:watch`                                                             |
-| Tests d'un seul package     | `pnpm --filter @fbr/shared test`                                              |
-| API en dev (reload)         | `pnpm --filter @fbr/api dev` → `GET http://localhost:3001/health`             |
-| Worker en dev               | `pnpm --filter @fbr/worker dev`                                               |
-| Dashboard en dev            | `pnpm --filter @fbr/web dev` → `http://localhost:3000`                        |
-| Corriger le formatage       | `pnpm format`                                                                 |
-| Corriger le lint            | `pnpm lint:fix`                                                               |
+| Besoin                      | Commande                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Tout vérifier (comme la CI) | `pnpm typecheck && pnpm lint && pnpm format:check && pnpm build && pnpm test`                                  |
+| Tests en watch              | `pnpm test:watch`                                                                                              |
+| Tests d'un seul package     | `pnpm --filter @fbr/shared test`                                                                               |
+| API en dev (reload)         | `pnpm --filter @fbr/api dev` → `GET http://localhost:3001/health`                                              |
+| Worker en dev               | `pnpm --filter @fbr/worker dev`                                                                                |
+| Dashboard en dev            | `pnpm --filter @fbr/web dev` → `http://localhost:3000`                                                         |
+| Sidecar vols réels (opt.)   | `docker compose --profile scraper up -d flight-scraper` + `FAST_FLIGHTS_URL=http://localhost:8000` dans `.env` |
+| Corriger le formatage       | `pnpm format`                                                                                                  |
+| Corriger le lint            | `pnpm lint:fix`                                                                                                |
 
 ## Règles par phase
 
