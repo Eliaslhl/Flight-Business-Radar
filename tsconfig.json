@@ -13,6 +13,8 @@
     { "path": "./packages/search-engine/tsconfig.build.json" },
     { "path": "./packages/analytics/tsconfig.build.json" },
     { "path": "./packages/fx/tsconfig.build.json" },
+    { "path": "./packages/alerting/tsconfig.build.json" },
+    { "path": "./packages/notifications/tsconfig.build.json" },
     { "path": "./packages/queue/tsconfig.build.json" },
     { "path": "./packages/database/tsconfig.build.json" },
     { "path": "./apps/api/tsconfig.build.json" },

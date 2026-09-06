@@ -54,9 +54,10 @@ L'API (`POST /api/searches/:id/run`) peut enfiler un job `reason: "manual"` imm�
 5. `upsertOffer` + `upsertProviderLink` + **INSERT** `price_snapshots` (jamais d'écrasement), avec `price_eur_cents` normalisé par `FxService` (`@fbr/fx`) ;
 6. `markCombinationsChecked` ;
 7. **passe `analyze`** (`analyzeOffers`, Phase 4) : par offre touchée, `derivePriceEvents` (`@fbr/analytics`) → INSERT `price_events` + résolution des baisses ouvertes revenues ;
-8. `computeNextIntervalSeconds` (palier COLD/NORMAL/WARM/HOT/VERIFY + plancher provider + jitter) et `computeSearchPriority` → `updateSearchSchedule`.
+8. **pipeline d'alerte** (`runAlertPipeline`, Phase 5) : `matchAlerts` → cooldown → dédup (`dedupe_key`) → **confirmation** des prix exceptionnels (re-requête via `@fbr/fx`) → `NotificationService.dispatch` → lignes `notifications` ; voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md) ;
+9. `computeNextIntervalSeconds` (palier COLD/NORMAL/WARM/HOT/VERIFY + plancher provider + jitter) et `computeSearchPriority` → `updateSearchSchedule`.
 
-Retourne un `SearchRunSummary` (combinaisons, offres, snapshots, meilleur prix, `eventsDetected`, `eventsResolved`, palier, prochain intervalle, erreurs provider).
+Retourne un `SearchRunSummary` (combinaisons, offres, snapshots, meilleur prix, `eventsDetected`, `eventsResolved`, `alertsTriggered`, `alertsSuppressed`, `confirmationsFailed`, palier, prochain intervalle, erreurs provider).
 
 ## Surveillance adaptative (`@fbr/search-engine`)
 

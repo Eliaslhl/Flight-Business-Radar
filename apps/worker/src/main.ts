@@ -7,7 +7,9 @@ import {
   type SearchJob,
 } from "@fbr/queue";
 import { DEFAULT_DROP_THRESHOLDS } from "@fbr/analytics";
+import { ConsoleChannel, NotificationService } from "@fbr/notifications";
 import { createLogger, LogEvent } from "@fbr/shared";
+import { buildConfirmer } from "./confirmer.js";
 import { buildFxService } from "./fx.js";
 import { buildProviderRegistry } from "./providers.js";
 import { createScheduler } from "./scheduler.js";
@@ -21,6 +23,10 @@ const connection = createQueueConnection(config.redis.url);
 const queue = createSearchQueue(connection);
 const registry = buildProviderRegistry(config, logger);
 const fx = buildFxService(config, db.db);
+const notificationService = new NotificationService({
+  channels: [new ConsoleChannel(logger)],
+  logger,
+});
 
 const processorDeps: SearchProcessorDeps = {
   db: db.db,
@@ -37,6 +43,8 @@ const processorDeps: SearchProcessorDeps = {
     unusualMinSample: config.detection.analyticsMinSample,
   },
   toBaseCents: (cents, currency) => fx.toBaseCents(cents, currency),
+  notificationService,
+  confirm: buildConfirmer(registry, fx),
 };
 
 const worker = createSearchWorker((job: SearchJob) => processSearchRun(processorDeps, job.data), {

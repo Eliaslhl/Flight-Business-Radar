@@ -64,6 +64,38 @@ export const buildRequestForCombination = (
   });
 };
 
+export interface OfferLike {
+  readonly destination: string;
+  readonly outboundDate: string;
+  readonly returnDate: string | null;
+  readonly tripDays: number | null;
+}
+
+/**
+ * Construit une requête ciblant **exactement l'itinéraire d'une offre connue**
+ * (re-vérification d'un prix — Phase 0 §10).
+ */
+export const buildRequestForOffer = (search: SearchLike, offer: OfferLike): FlightSearchRequest => {
+  const outbound = isoDate(offer.outboundDate);
+  const tripDays =
+    offer.tripDays ??
+    (offer.returnDate ? daysBetween(outbound, isoDate(offer.returnDate)) : search.minTripDays);
+
+  return flightSearchRequestSchema.parse({
+    origin: search.origin,
+    destinations: [offer.destination],
+    cabinClass: search.cabinClass,
+    departureWindow: { start: outbound, end: outbound },
+    tripDuration: { minDays: tripDays, maxDays: tripDays },
+    maxStops: search.maxStops,
+    maxPrice: money(search.maxPriceCents, search.currency),
+    targetPrice: money(search.targetPriceCents, search.currency),
+    currency: search.currency,
+    preferredAirlines: [...search.preferredAirlines],
+    excludedAirlines: [...search.excludedAirlines],
+  });
+};
+
 /** Construit la requête « pleine fenêtre » (utile pour la génération de combinaisons / le mode Radar). */
 export const buildWindowRequest = (search: SearchLike): FlightSearchRequest =>
   flightSearchRequestSchema.parse({

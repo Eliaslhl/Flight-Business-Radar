@@ -3,7 +3,7 @@
 - **SGBD** : PostgreSQL 16 (local via `docker compose`).
 - **Accès** : [Drizzle ORM](https://orm.drizzle.team) + driver [`postgres.js`](https://github.com/porsager/postgres).
 - **Migrations** : SQL versionné dans `packages/database/drizzle/`, généré par `drizzle-kit` et appliqué par `packages/database/src/migrate.ts`.
-- **Argent** : colonnes `numeric` (jamais `float`). Côté code : centimes entiers (`@fbr/shared` `Cents`).
+- **Argent** : centimes entiers (`integer`, exact — jamais de flottant). Côté code : `@fbr/shared` `Cents`. Les taux de change utilisent `numeric(18,8)`.
 - **Temps** : `timestamptz` en UTC.
 
 ## Commandes
@@ -14,11 +14,12 @@ pnpm db:migrate    # applique les migrations en attente à DATABASE_URL (idempot
 pnpm --filter @fbr/database db:studio   # explorateur Drizzle
 ```
 
-## État du schéma — Phases 3–4
+## État du schéma — Phases 3–5
 
 `0000` : `app_meta` (table technique de bout-en-bout).
 `0001` : moteur de recherche + seed de l'utilisateur de dev (`00000000-…-0001` / `dev@localhost`).
 `0002` : `price_events` (dérivés) + `fx_rates` (cache des taux de change).
+`0003` : `alerts` + `notifications` (avec `dedupe_key` anti-spam).
 
 | Table                      | Rôle                                                                                                              | Points clés                                                                                                   |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -30,8 +31,11 @@ pnpm --filter @fbr/database db:studio   # explorateur Drizzle
 | **`price_snapshots`**      | **Append-only** : observation de prix (`price_eur_cents` normalisé par `@fbr/fx`)                                 | `bigserial` id, index `(flight_offer_id, observed_at)` et `(search_id, observed_at)` ; jamais d'UPDATE/DELETE |
 | `price_events`             | Événements dérivés (`DROP`, `FLASH_DROP`, `RISE`, `RECORD_LOW/HIGH`, `TARGET_HIT`, `UNUSUAL`)                     | `resolved_at` / `duration_seconds` au retour du prix ; index partiel sur les événements ouverts               |
 | `fx_rates`                 | Cache des taux de change (`1 base` = `rate` `quote`, par jour)                                                    | PK `(base, quote, as_of)` ; source `frankfurter` \| `fixed`                                                   |
+| `alerts`                   | Alerte utilisateur sur une recherche (5 types) + cooldown                                                         | `threshold_eur_cents`, `enabled`, `cooldown_seconds`, `last_triggered_at` ; index `(search_id, enabled)`      |
+| `notifications`            | Historique des notifications diffusées (1 ligne / canal)                                                          | **unique `(dedupe_key, channel)`** ; `status` PENDING/SENT/FAILED/SUPPRESSED                                  |
 
 **Argent** : colonnes `*_cents` en `integer` (exact, jamais de flottant). **Temps** : `timestamptz` UTC.
+`price_snapshots.status` (OBSERVED → CONFIRMED / EXPIRED) est le **seul** champ mutable de la table ; le prix n'est jamais modifié.
 
 ### Partitionnement mensuel de `price_snapshots` — différé
 
@@ -39,9 +43,9 @@ Reporté à une migration dédiée (optimisation pure, invisible via Drizzle, au
 
 ## Tables à venir
 
-| Phase | Tables                                                                        |
-| ----- | ----------------------------------------------------------------------------- |
-| 5     | `alerts`, `notifications` (avec `dedupe_key` anti-spam) ; `provider_requests` |
-| 9     | `airports`, `airlines` (référentiels pour le mode Radar)                      |
+| Phase | Tables                                                         |
+| ----- | -------------------------------------------------------------- |
+| 7+    | `provider_requests` (observabilité des appels providers réels) |
+| 9     | `airports`, `airlines` (référentiels pour le mode Radar)       |
 
 Chaque phase ajoute ses tables dans `packages/database/src/schema/*.table.ts` + une migration dédiée. Aucune migration appliquée n'est éditée après coup.

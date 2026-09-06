@@ -145,6 +145,54 @@ suite("API /api/searches (intégration Postgres)", () => {
     expect(events.json<{ events: unknown[] }>().events).toEqual([]);
   });
 
+  it("gère les alertes : création, listing, désactivation, suppression", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id: searchId } = created.json<{ id: string }>();
+
+    const bad = await app.inject({
+      method: "POST",
+      url: "/api/alerts",
+      payload: { searchId, type: "NOPE" },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    const missing = await app.inject({
+      method: "POST",
+      url: "/api/alerts",
+      payload: { searchId: "00000000-0000-0000-0000-0000000000ff", type: "FLASH_DROP" },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const alert = await app.inject({
+      method: "POST",
+      url: "/api/alerts",
+      payload: { searchId, type: "FLASH_DROP", cooldownSeconds: 900 },
+    });
+    expect(alert.statusCode).toBe(201);
+    const alertId = alert.json<{ id: string; enabled: boolean }>().id;
+
+    const list = await app.inject({ method: "GET", url: `/api/alerts?searchId=${searchId}` });
+    expect(list.json<{ alerts: unknown[] }>().alerts).toHaveLength(1);
+
+    const disabled = await app.inject({ method: "POST", url: `/api/alerts/${alertId}/disable` });
+    expect(disabled.json<{ enabled: boolean }>().enabled).toBe(false);
+
+    const del = await app.inject({ method: "DELETE", url: `/api/alerts/${alertId}` });
+    expect(del.statusCode).toBe(204);
+    expect(
+      (await app.inject({ method: "GET", url: `/api/alerts?searchId=${searchId}` })).json<{
+        alerts: unknown[];
+      }>().alerts,
+    ).toHaveLength(0);
+  });
+
+  it("/notifications part vide pour une recherche fraîche", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({ method: "GET", url: `/api/searches/${id}/notifications` });
+    expect(res.json<{ notifications: unknown[] }>().notifications).toEqual([]);
+  });
+
   it("404 sur une recherche inconnue", async () => {
     const res = await app.inject({
       method: "GET",

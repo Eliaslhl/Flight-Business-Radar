@@ -2,6 +2,7 @@ import {
   createSearch,
   deleteSearch,
   getSearch,
+  listNotificationsForSearch,
   listObservationsForAnalytics,
   listPriceEventsForSearch,
   listSearches,
@@ -209,6 +210,30 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
       minSampleSize: deps.analyticsMinSample,
       overallMinSampleSize: deps.analyticsMinSample,
     });
+  });
+
+  app.get("/api/searches/:id/notifications", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const query = request.query as { limit?: string };
+    const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
+    const rows = await listNotificationsForSearch(db, id, { limit });
+    return {
+      notifications: rows.map((n) => ({
+        id: n.id,
+        alertId: n.alertId,
+        priceEventId: n.priceEventId,
+        channel: n.channel,
+        status: n.status,
+        subject: n.subject,
+        body: n.body,
+        dedupeKey: n.dedupeKey,
+        createdAt: n.createdAt.toISOString(),
+        sentAt: n.sentAt?.toISOString() ?? null,
+        error: n.error,
+      })),
+    };
   });
 
   app.get("/api/searches/:id/events", async (request, reply) => {

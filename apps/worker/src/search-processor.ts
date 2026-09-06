@@ -14,6 +14,7 @@ import {
 } from "@fbr/database";
 import { daysBetween, isoDate, offerMaxStops, type FlightOffer } from "@fbr/flight-domain";
 import { type ProviderRegistry } from "@fbr/flight-providers";
+import { type NotificationService } from "@fbr/notifications";
 import { normalizeSearchResults } from "@fbr/normalizer";
 import { type SearchRunJobData } from "@fbr/queue";
 import {
@@ -21,12 +22,14 @@ import {
   computeNextIntervalSeconds,
   computeSearchPriority,
   generateDateCombinations,
-  type SearchLike,
 } from "@fbr/search-engine";
 import { type DropThresholds } from "@fbr/analytics";
 import { LogEvent, type Logger } from "@fbr/shared";
 import type { InsertSnapshotInput } from "@fbr/database";
 import { analyzeOffers } from "./analyzer.js";
+import { runAlertPipeline } from "./alert-pipeline.js";
+import { type ConfirmFn } from "./confirmer.js";
+import { toSearchLike } from "./mappers.js";
 
 export interface SearchProcessorDeps {
   readonly db: Database;
@@ -38,6 +41,9 @@ export interface SearchProcessorDeps {
   readonly thresholds: DropThresholds;
   /** Conversion vers la devise de référence (centimes) — injectée par le worker. */
   readonly toBaseCents: (amountCents: number, currency: string) => Promise<number>;
+  readonly notificationService: NotificationService;
+  /** Re-requête d'un itinéraire pour confirmer un prix (Phase 0 §10). */
+  readonly confirm: ConfirmFn;
   /** Horloge injectable (tests). */
   readonly now?: () => Date;
 }
@@ -52,25 +58,12 @@ export interface SearchRunSummary {
   readonly providerErrors: number;
   readonly eventsDetected: number;
   readonly eventsResolved: number;
+  readonly alertsTriggered: number;
+  readonly alertsSuppressed: number;
+  readonly confirmationsFailed: number;
   readonly tier?: string;
   readonly nextIntervalSeconds?: number;
 }
-
-const toSearchLike = (row: SearchRow): SearchLike => ({
-  origin: row.origin,
-  destinations: row.destinations,
-  cabinClass: row.cabinClass,
-  minTripDays: row.minTripDays,
-  maxTripDays: row.maxTripDays,
-  departureWindowStart: row.departureWindowStart,
-  departureWindowEnd: row.departureWindowEnd,
-  maxPriceCents: row.maxPriceCents,
-  targetPriceCents: row.targetPriceCents,
-  currency: row.currency,
-  maxStops: row.maxStops,
-  preferredAirlines: row.preferredAirlines,
-  excludedAirlines: row.excludedAirlines,
-});
 
 const ensureCombinations = async (deps: SearchProcessorDeps, search: SearchRow): Promise<void> => {
   if ((await countCombinations(deps.db, search.id)) > 0) return;
@@ -96,13 +89,19 @@ const ensureCombinations = async (deps: SearchProcessorDeps, search: SearchRow):
   );
 };
 
+interface PersistedOffers {
+  readonly snapshotInputs: InsertSnapshotInput[];
+  readonly offers: { id: string; offer: FlightOffer }[];
+}
+
 const persistOffers = async (
   deps: SearchProcessorDeps,
   search: SearchRow,
   combo: SearchDateCombinationRow,
   offers: readonly FlightOffer[],
-): Promise<InsertSnapshotInput[]> => {
-  const snapshots: InsertSnapshotInput[] = [];
+): Promise<PersistedOffers> => {
+  const snapshotInputs: InsertSnapshotInput[] = [];
+  const persisted: { id: string; offer: FlightOffer }[] = [];
   for (const offer of offers) {
     const { id: flightOfferId } = await upsertOffer(deps.db, {
       fingerprint: offer.fingerprint,
@@ -121,7 +120,7 @@ const persistOffers = async (
       provider: offer.provider,
       ...(offer.bookingUrl ? { bookingUrl: offer.bookingUrl } : {}),
     });
-    snapshots.push({
+    snapshotInputs.push({
       flightOfferId,
       searchId: search.id,
       provider: offer.provider,
@@ -132,8 +131,9 @@ const persistOffers = async (
       seatsRemaining: offer.seatsRemaining ?? null,
       observedAt: new Date(offer.observedAt),
     });
+    persisted.push({ id: flightOfferId, offer });
   }
-  return snapshots;
+  return { snapshotInputs, offers: persisted };
 };
 
 const skippedSummary = (
@@ -149,6 +149,9 @@ const skippedSummary = (
   providerErrors: 0,
   eventsDetected: 0,
   eventsResolved: 0,
+  alertsTriggered: 0,
+  alertsSuppressed: 0,
+  confirmationsFailed: 0,
 });
 
 /**
@@ -190,6 +193,7 @@ export const processSearchRun = async (
 
   const searchLike = toSearchLike(search);
   const allSnapshots: InsertSnapshotInput[] = [];
+  const offersById = new Map<string, FlightOffer>();
   let offersKept = 0;
   let providerErrors = 0;
   let bestPriceCents: number | null = null;
@@ -207,7 +211,9 @@ export const processSearchRun = async (
         bestPriceCents = offer.price.amount;
       }
     }
-    allSnapshots.push(...(await persistOffers(deps, search, combo, normalized.offers)));
+    const persisted = await persistOffers(deps, search, combo, normalized.offers);
+    allSnapshots.push(...persisted.snapshotInputs);
+    for (const { id, offer } of persisted.offers) offersById.set(id, offer);
   }
 
   const snapshotsInserted = await insertSnapshots(deps.db, allSnapshots);
@@ -219,9 +225,20 @@ export const processSearchRun = async (
 
   // Passe `analyze` : dérivation + résolution des événements de prix (Phase 4).
   const offerIds = [...new Set(allSnapshots.map((s) => s.flightOfferId))];
-  const { eventsDetected, eventsResolved } = await analyzeOffers(
+  const { eventsDetected, eventsResolved, detected } = await analyzeOffers(
     { db: deps.db, logger: deps.logger, thresholds: deps.thresholds },
     { search, offerIds, now: runAt },
+  );
+
+  // Pipeline d'alerte (Phase 5) : cooldown → dédup → confirmation → notification.
+  const { alertsTriggered, alertsSuppressed, confirmationsFailed } = await runAlertPipeline(
+    {
+      db: deps.db,
+      logger: deps.logger,
+      notificationService: deps.notificationService,
+      confirm: deps.confirm,
+    },
+    { search, detected, offersById, now: runAt },
   );
 
   const daysUntilDeparture = daysBetween(
@@ -264,6 +281,9 @@ export const processSearchRun = async (
       bestPriceCents,
       eventsDetected,
       eventsResolved,
+      alertsTriggered,
+      alertsSuppressed,
+      confirmationsFailed,
       tier,
       nextIntervalSeconds: intervalSeconds,
       providerErrors,
@@ -280,6 +300,9 @@ export const processSearchRun = async (
     providerErrors,
     eventsDetected,
     eventsResolved,
+    alertsTriggered,
+    alertsSuppressed,
+    confirmationsFailed,
     tier,
     nextIntervalSeconds: intervalSeconds,
   };
