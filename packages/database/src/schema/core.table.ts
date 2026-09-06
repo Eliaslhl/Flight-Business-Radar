@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   boolean,
   date,
@@ -7,8 +8,10 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -170,8 +173,9 @@ export const offerProviderLinks = pgTable(
 );
 
 // ─── price_snapshots (APPEND ONLY) ──────────────────────────────────────────
-// Jamais d'UPDATE/DELETE en fonctionnement normal. Partitionnement mensuel +
-// colonnes FX (`price_eur_cents`) ajoutés en Phase 4.
+// Jamais d'UPDATE/DELETE en fonctionnement normal. `price_eur_cents` est
+// alimenté par le worker via `@fbr/fx`. Partitionnement mensuel : différé
+// (optimisation, invisible via Drizzle) — cf. docs/DATABASE.md.
 
 export const priceSnapshots = pgTable(
   "price_snapshots",
@@ -196,6 +200,63 @@ export const priceSnapshots = pgTable(
   ],
 );
 
+// ─── price_events (dérivés — Phase 4) ──────────────────────────────────────
+
+export const priceEventTypeEnum = pgEnum("price_event_type", [
+  "DROP",
+  "FLASH_DROP",
+  "RISE",
+  "RECORD_LOW",
+  "RECORD_HIGH",
+  "TARGET_HIT",
+  "UNUSUAL",
+]);
+
+export const priceEvents = pgTable(
+  "price_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    flightOfferId: uuid("flight_offer_id")
+      .notNull()
+      .references(() => flightOffers.id, { onDelete: "cascade" }),
+    searchId: uuid("search_id").references(() => searches.id, { onDelete: "set null" }),
+    type: priceEventTypeEnum("type").notNull(),
+    previousPriceEurCents: integer("previous_price_eur_cents"),
+    newPriceEurCents: integer("new_price_eur_cents").notNull(),
+    dropAmountEurCents: integer("drop_amount_eur_cents"),
+    dropPct: doublePrecision("drop_pct"),
+    previousSnapshotId: bigint("previous_snapshot_id", { mode: "number" }),
+    newSnapshotId: bigint("new_snapshot_id", { mode: "number" }).notNull(),
+    confirmed: boolean("confirmed").notNull().default(false),
+    detectedAt: timestamp("detected_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Renseigné quand le prix est revenu au-dessus du niveau de l'événement. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    durationSeconds: integer("duration_seconds"),
+  },
+  (t) => [
+    index("price_events_search_detected_idx").on(t.searchId, t.detectedAt),
+    index("price_events_offer_detected_idx").on(t.flightOfferId, t.detectedAt),
+    index("price_events_open_idx")
+      .on(t.flightOfferId, t.type)
+      .where(sql`${t.resolvedAt} is null`),
+  ],
+);
+
+// ─── fx_rates (cache des taux de change — Phase 4) ─────────────────────────
+
+export const fxRates = pgTable(
+  "fx_rates",
+  {
+    base: varchar("base", { length: 3 }).notNull(),
+    quote: varchar("quote", { length: 3 }).notNull(),
+    rate: numeric("rate", { precision: 18, scale: 8 }).notNull(),
+    asOf: date("as_of").notNull(),
+    source: text("source").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.base, t.quote, t.asOf] })],
+);
+
 // ─── relations (pour les requêtes typées `db.query`) ────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -218,6 +279,15 @@ export const searchDateCombinationsRelations = relations(searchDateCombinations,
 export const flightOffersRelations = relations(flightOffers, ({ many }) => ({
   providerLinks: many(offerProviderLinks),
   snapshots: many(priceSnapshots),
+  events: many(priceEvents),
+}));
+
+export const priceEventsRelations = relations(priceEvents, ({ one }) => ({
+  offer: one(flightOffers, {
+    fields: [priceEvents.flightOfferId],
+    references: [flightOffers.id],
+  }),
+  search: one(searches, { fields: [priceEvents.searchId], references: [searches.id] }),
 }));
 
 export const priceSnapshotsRelations = relations(priceSnapshots, ({ one }) => ({
@@ -238,3 +308,6 @@ export type FlightOfferRow = typeof flightOffers.$inferSelect;
 export type NewFlightOfferRow = typeof flightOffers.$inferInsert;
 export type PriceSnapshotRow = typeof priceSnapshots.$inferSelect;
 export type NewPriceSnapshotRow = typeof priceSnapshots.$inferInsert;
+export type PriceEventRow = typeof priceEvents.$inferSelect;
+export type NewPriceEventRow = typeof priceEvents.$inferInsert;
+export type FxRateRow = typeof fxRates.$inferSelect;

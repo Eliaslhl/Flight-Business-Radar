@@ -2,3 +2,5 @@ export * from "./searches.js";
 export * from "./date-combinations.js";
 export * from "./offers.js";
 export * from "./snapshots.js";
+export * from "./price-events.js";
+export * from "./fx-rates.js";

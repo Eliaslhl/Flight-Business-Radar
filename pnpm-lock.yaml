@@ -50,6 +50,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fbr/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@fbr/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -84,6 +87,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@fbr/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@fbr/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -96,6 +102,9 @@ importers:
       '@fbr/flight-providers':
         specifier: workspace:*
         version: link:../../packages/flight-providers
+      '@fbr/fx':
+        specifier: workspace:*
+        version: link:../../packages/fx
       '@fbr/normalizer':
         specifier: workspace:*
         version: link:../../packages/normalizer
@@ -115,6 +124,12 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.23.13
+
+  packages/analytics:
+    dependencies:
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/config:
     dependencies:
@@ -158,6 +173,12 @@ importers:
       '@fbr/flight-domain':
         specifier: workspace:*
         version: link:../flight-domain
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/fx:
+    dependencies:
       '@fbr/shared':
         specifier: workspace:*
         version: link:../shared

@@ -60,7 +60,12 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
   });
 
   if (db) {
-    registerSearchRoutes(app, { db: db.db, ...(queue ? { queue } : {}), logger });
+    registerSearchRoutes(app, {
+      db: db.db,
+      ...(queue ? { queue } : {}),
+      logger,
+      analyticsMinSample: config.detection.analyticsMinSample,
+    });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

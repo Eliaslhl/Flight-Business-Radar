@@ -23,8 +23,10 @@ import {
   generateDateCombinations,
   type SearchLike,
 } from "@fbr/search-engine";
+import { type DropThresholds } from "@fbr/analytics";
 import { LogEvent, type Logger } from "@fbr/shared";
 import type { InsertSnapshotInput } from "@fbr/database";
+import { analyzeOffers } from "./analyzer.js";
 
 export interface SearchProcessorDeps {
   readonly db: Database;
@@ -32,6 +34,10 @@ export interface SearchProcessorDeps {
   readonly logger: Logger;
   readonly combinationsPerRun: number;
   readonly providerMinIntervalSeconds: number;
+  /** Seuils de détection de baisse (config). */
+  readonly thresholds: DropThresholds;
+  /** Conversion vers la devise de référence (centimes) — injectée par le worker. */
+  readonly toBaseCents: (amountCents: number, currency: string) => Promise<number>;
   /** Horloge injectable (tests). */
   readonly now?: () => Date;
 }
@@ -44,6 +50,8 @@ export interface SearchRunSummary {
   readonly snapshotsInserted: number;
   readonly bestPriceCents: number | null;
   readonly providerErrors: number;
+  readonly eventsDetected: number;
+  readonly eventsResolved: number;
   readonly tier?: string;
   readonly nextIntervalSeconds?: number;
 }
@@ -119,6 +127,7 @@ const persistOffers = async (
       provider: offer.provider,
       priceCents: offer.price.amount,
       currency: offer.price.currency,
+      priceEurCents: await deps.toBaseCents(offer.price.amount, offer.price.currency),
       availability: offer.availability,
       seatsRemaining: offer.seatsRemaining ?? null,
       observedAt: new Date(offer.observedAt),
@@ -126,6 +135,21 @@ const persistOffers = async (
   }
   return snapshots;
 };
+
+const skippedSummary = (
+  searchId: string,
+  skipped: NonNullable<SearchRunSummary["skipped"]>,
+): SearchRunSummary => ({
+  searchId,
+  skipped,
+  combinations: 0,
+  offersKept: 0,
+  snapshotsInserted: 0,
+  bestPriceCents: null,
+  providerErrors: 0,
+  eventsDetected: 0,
+  eventsResolved: 0,
+});
 
 /**
  * Traite un job `search.run` : (re)génère les combinaisons si besoin, sonde les
@@ -146,27 +170,11 @@ export const processSearchRun = async (
       { event: LogEvent.SearchStarted, searchId: job.searchId },
       "recherche introuvable",
     );
-    return {
-      searchId: job.searchId,
-      skipped: "not_found",
-      combinations: 0,
-      offersKept: 0,
-      snapshotsInserted: 0,
-      bestPriceCents: null,
-      providerErrors: 0,
-    };
+    return skippedSummary(job.searchId, "not_found");
   }
 
   if (job.reason === "scheduled" && search.status !== "ACTIVE") {
-    return {
-      searchId: search.id,
-      skipped: "not_active",
-      combinations: 0,
-      offersKept: 0,
-      snapshotsInserted: 0,
-      bestPriceCents: null,
-      providerErrors: 0,
-    };
+    return skippedSummary(search.id, "not_active");
   }
 
   deps.logger.info(
@@ -177,15 +185,7 @@ export const processSearchRun = async (
   await ensureCombinations(deps, search);
   const picked = await pickCombinations(deps.db, search.id, deps.combinationsPerRun);
   if (picked.length === 0) {
-    return {
-      searchId: search.id,
-      skipped: "no_combinations",
-      combinations: 0,
-      offersKept: 0,
-      snapshotsInserted: 0,
-      bestPriceCents: null,
-      providerErrors: 0,
-    };
+    return skippedSummary(search.id, "no_combinations");
   }
 
   const searchLike = toSearchLike(search);
@@ -215,6 +215,13 @@ export const processSearchRun = async (
     deps.db,
     picked.map((c) => c.id),
     runAt,
+  );
+
+  // Passe `analyze` : dérivation + résolution des événements de prix (Phase 4).
+  const offerIds = [...new Set(allSnapshots.map((s) => s.flightOfferId))];
+  const { eventsDetected, eventsResolved } = await analyzeOffers(
+    { db: deps.db, logger: deps.logger, thresholds: deps.thresholds },
+    { search, offerIds, now: runAt },
   );
 
   const daysUntilDeparture = daysBetween(
@@ -255,6 +262,8 @@ export const processSearchRun = async (
       offersKept,
       snapshotsInserted,
       bestPriceCents,
+      eventsDetected,
+      eventsResolved,
       tier,
       nextIntervalSeconds: intervalSeconds,
       providerErrors,
@@ -269,6 +278,8 @@ export const processSearchRun = async (
     snapshotsInserted,
     bestPriceCents,
     providerErrors,
+    eventsDetected,
+    eventsResolved,
     tier,
     nextIntervalSeconds: intervalSeconds,
   };

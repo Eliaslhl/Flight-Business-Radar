@@ -11,6 +11,8 @@
     { "path": "./packages/flight-providers/tsconfig.build.json" },
     { "path": "./packages/normalizer/tsconfig.build.json" },
     { "path": "./packages/search-engine/tsconfig.build.json" },
+    { "path": "./packages/analytics/tsconfig.build.json" },
+    { "path": "./packages/fx/tsconfig.build.json" },
     { "path": "./packages/queue/tsconfig.build.json" },
     { "path": "./packages/database/tsconfig.build.json" },
     { "path": "./apps/api/tsconfig.build.json" },
