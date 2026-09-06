@@ -14,10 +14,12 @@
     "clean": "rimraf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@fbr/analytics": "workspace:*",
     "@fbr/config": "workspace:*",
     "@fbr/database": "workspace:*",
     "@fbr/flight-domain": "workspace:*",
     "@fbr/flight-providers": "workspace:*",
+    "@fbr/fx": "workspace:*",
     "@fbr/normalizer": "workspace:*",
     "@fbr/queue": "workspace:*",
     "@fbr/search-engine": "workspace:*",

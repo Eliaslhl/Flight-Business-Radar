@@ -15,6 +15,13 @@
       "when": 1788654797960,
       "tag": "0001_sad_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788656685597,
+      "tag": "0002_bright_karen_page",
+      "breakpoints": true
     }
   ]
 }

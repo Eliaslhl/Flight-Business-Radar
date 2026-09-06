@@ -12,25 +12,27 @@
 - **Config centralisée** : pas de `process.env` hors de `@fbr/config`.
 - **Logs structurés** : toujours via `@fbr/shared` `createLogger`, avec un `event` nommé (`LogEvent`).
 
-## Packages (état Phase 3)
+## Packages (état Phase 4)
 
-| Package                 | Rôle                                                                                                                                        | Dépend de                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `@fbr/shared`           | logger pino (redaction secrets), `AppError` (+ `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent`                    | —                                     |
-| `@fbr/config`           | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                            | `@fbr/shared`                         |
-| `@fbr/flight-domain`    | modèle métier pur : `FlightSearchRequest`, `FlightOffer` (+ schémas Zod), value objects IATA/dates/devise/cabine, `computeFingerprint`      | `@fbr/shared`                         |
-| `@fbr/flight-providers` | interface `FlightProvider`, `ProviderRegistry` (exécution parallèle isolée), `MockFlightProvider` (7 scénarios)                             | `@fbr/flight-domain`, `@fbr/shared`   |
-| `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication (`dedupeOffers`), orchestration (`normalizeSearchResults`)                                | `@fbr/flight-domain`, `@fbr/shared`   |
-| `@fbr/search-engine`    | pur : `generateDateCombinations` (anti-explosion), `computeSearchPriority`, `computeNextIntervalSeconds` (surveillance adaptative), mappers | `@fbr/flight-domain`, `@fbr/shared`   |
-| `@fbr/queue`            | BullMQ + Redis : connexion, file `search`, `createSearchWorker`, `enqueueSearchRun`                                                         | `@fbr/shared` (+ `bullmq`, `ioredis`) |
-| `@fbr/database`         | schéma Drizzle (7 tables), client `postgres.js`, `runMigrations`, repositories typés (searches / combinations / offers / snapshots)         | `@fbr/shared`, `@fbr/config` (dev)    |
+| Package                 | Rôle                                                                                                                                              | Dépend de                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `@fbr/shared`           | logger pino (redaction secrets), `AppError` (+ `retryable`), `Result`, helpers monétaires (centimes entiers), `LogEvent`                          | —                                     |
+| `@fbr/config`           | schéma Zod de l'environnement, `loadConfig()` fail-fast, singleton `getConfig()`                                                                  | `@fbr/shared`                         |
+| `@fbr/flight-domain`    | modèle métier pur : `FlightSearchRequest`, `FlightOffer` (+ schémas Zod), value objects IATA/dates/devise/cabine, `computeFingerprint`            | `@fbr/shared`                         |
+| `@fbr/flight-providers` | interface `FlightProvider`, `ProviderRegistry` (exécution parallèle isolée), `MockFlightProvider` (7 scénarios)                                   | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication (`dedupeOffers`), orchestration (`normalizeSearchResults`)                                      | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/search-engine`    | pur : `generateDateCombinations` (anti-explosion), `computeSearchPriority`, `computeNextIntervalSeconds` (surveillance adaptative), mappers       | `@fbr/flight-domain`, `@fbr/shared`   |
+| `@fbr/analytics`        | pur : stats descriptives / groupées, tendance, `derivePriceEvents`, `buildAnalyticsReport` (garde « données insuffisantes »)                      | `@fbr/shared`                         |
+| `@fbr/fx`               | pur : `FxProvider` (fixed / Frankfurter), `FxService` sur `RateStore` — normalisation en EUR                                                      | `@fbr/shared`                         |
+| `@fbr/queue`            | BullMQ + Redis : connexion, file `search`, `createSearchWorker`, `enqueueSearchRun`                                                               | `@fbr/shared` (+ `bullmq`, `ioredis`) |
+| `@fbr/database`         | schéma Drizzle (9 tables), client `postgres.js`, `runMigrations`, repositories typés (searches / combinations / offers / snapshots / events / fx) | `@fbr/shared`, `@fbr/config` (dev)    |
 
-### Apps (état Phase 3)
+### Apps (état Phase 4)
 
-| App           | Rôle             | Détail                                                                                                                                                                  |
-| ------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fbr/api`    | API HTTP Fastify | `buildApp({ config, logger, db?, queue? })`. `/health` + `/api/searches` (CRUD, activate/pause, run, flights, prices). Controllers fins → repositories + search-engine. |
-| `@fbr/worker` | Process de fond  | Scheduler (scan des recherches dues → `search.run`) + worker BullMQ : `ProviderRegistry` → `normalizer` → `price_snapshots` (append-only) → replanification adaptative. |
+| App           | Rôle             | Détail                                                                                                                                                                                                           |
+| ------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@fbr/api`    | API HTTP Fastify | `buildApp({ config, logger, db?, queue? })`. `/health` + `/api/searches` (CRUD, activate/pause, run, flights, prices, **analytics**, **events**). Controllers fins.                                              |
+| `@fbr/worker` | Process de fond  | Scheduler + worker BullMQ : `ProviderRegistry` → `normalizer` → `price_snapshots` (append-only, `price_eur_cents` via `@fbr/fx`) → **`analyzeOffers`** (dérivation `price_events`) → replanification adaptative. |
 
 `apps/web` (Next.js) est ajouté en **Phase 6**.
 

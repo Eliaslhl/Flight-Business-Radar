@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { type Database } from "../client.js";
 import {
   flightOffers,
@@ -136,3 +136,101 @@ export const getOfferPriceHistory = async (
     .orderBy(desc(priceSnapshots.observedAt))
     .limit(options.limit ?? 500)
     .then((rows) => rows.map((r) => r.snapshot));
+
+/** Les `limit` snapshots les plus récents d'une offre (pour la dérivation d'événements). */
+export const getRecentSnapshotsForOffer = async (
+  db: Database,
+  flightOfferId: string,
+  limit = 2,
+): Promise<PriceSnapshotRow[]> =>
+  db
+    .select()
+    .from(priceSnapshots)
+    .where(eq(priceSnapshots.flightOfferId, flightOfferId))
+    .orderBy(desc(priceSnapshots.observedAt), desc(priceSnapshots.id))
+    .limit(limit);
+
+export interface OfferPriceAggregate {
+  count: number;
+  minEurCents: number | null;
+  maxEurCents: number | null;
+  p10EurCents: number | null;
+}
+
+/** Agrégats historiques d'une offre sur `price_eur_cents` (normalisé). */
+export const getOfferPriceAggregate = async (
+  db: Database,
+  flightOfferId: string,
+  options: { beforeSnapshotId?: number } = {},
+): Promise<OfferPriceAggregate> => {
+  const where =
+    options.beforeSnapshotId !== undefined
+      ? and(
+          eq(priceSnapshots.flightOfferId, flightOfferId),
+          lt(priceSnapshots.id, options.beforeSnapshotId),
+        )
+      : eq(priceSnapshots.flightOfferId, flightOfferId);
+  const [row] = await db
+    .select({
+      count: sql<number>`count(${priceSnapshots.priceEurCents})::int`,
+      minEurCents: sql<number | null>`min(${priceSnapshots.priceEurCents})`,
+      maxEurCents: sql<number | null>`max(${priceSnapshots.priceEurCents})`,
+      p10EurCents: sql<
+        number | null
+      >`percentile_cont(0.1) within group (order by ${priceSnapshots.priceEurCents})`,
+    })
+    .from(priceSnapshots)
+    .where(where);
+  return {
+    count: row?.count ?? 0,
+    minEurCents: row?.minEurCents ?? null,
+    maxEurCents: row?.maxEurCents ?? null,
+    p10EurCents:
+      row?.p10EurCents === null || row?.p10EurCents === undefined
+        ? null
+        : Math.round(row.p10EurCents),
+  };
+};
+
+export interface AnalyticsObservation {
+  priceEurCents: number;
+  observedAt: Date;
+  outboundDate: string;
+  returnDate: string | null;
+  tripDays: number | null;
+  marketingAirline: string | null;
+  maxStops: number;
+}
+
+/** Observations enrichies (snapshot + offre) pour le moteur d'analyse d'une recherche. */
+export const listObservationsForAnalytics = async (
+  db: Database,
+  searchId: string,
+  options: { limit?: number } = {},
+): Promise<AnalyticsObservation[]> => {
+  const rows = await db
+    .select({
+      priceEurCents: priceSnapshots.priceEurCents,
+      observedAt: priceSnapshots.observedAt,
+      outboundDate: flightOffers.outboundDate,
+      returnDate: flightOffers.returnDate,
+      tripDays: flightOffers.tripDays,
+      marketingAirline: flightOffers.marketingAirline,
+      maxStops: flightOffers.maxStops,
+    })
+    .from(priceSnapshots)
+    .innerJoin(flightOffers, eq(flightOffers.id, priceSnapshots.flightOfferId))
+    .where(and(eq(priceSnapshots.searchId, searchId), isNotNull(priceSnapshots.priceEurCents)))
+    .orderBy(priceSnapshots.observedAt)
+    .limit(options.limit ?? 20_000);
+
+  return rows.map((r) => ({
+    priceEurCents: r.priceEurCents ?? 0,
+    observedAt: r.observedAt,
+    outboundDate: r.outboundDate,
+    returnDate: r.returnDate,
+    tripDays: r.tripDays,
+    marketingAirline: r.marketingAirline,
+    maxStops: r.maxStops,
+  }));
+};

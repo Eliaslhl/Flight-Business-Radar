@@ -14,7 +14,7 @@ describe("loadConfig", () => {
     expect(cfg.isProduction).toBe(false);
     expect(cfg.log).toEqual({ level: "info", pretty: false });
     expect(cfg.api).toEqual({ host: "0.0.0.0", port: 3001 });
-    expect(cfg.currency).toEqual({ base: "EUR", fxSource: "frankfurter" });
+    expect(cfg.currency).toEqual({ base: "EUR", fxSource: "frankfurter", fixedRates: {} });
     expect(cfg.providers.serpapi).toBeNull();
   });
 
@@ -69,5 +69,26 @@ describe("loadConfig", () => {
       providerMinIntervalSeconds: 60,
       mockScenario: "normal",
     });
+  });
+
+  it("expose les seuils de détection (en centimes) avec leurs défauts", () => {
+    const cfg = loadConfig({ ...baseEnv });
+    expect(cfg.detection).toEqual({
+      dropPct: 0.05,
+      flashDropPct: 0.12,
+      flashDropAbsCents: 12_000,
+      flashWindowMinutes: 90,
+      analyticsMinSample: 30,
+    });
+  });
+
+  it("parse FX_FIXED_RATES en objet et rejette un JSON invalide", () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      FX_SOURCE: "fixed",
+      FX_FIXED_RATES: '{"usd":1.1,"gbp":0.85}',
+    });
+    expect(cfg.currency.fixedRates).toEqual({ USD: 1.1, GBP: 0.85 });
+    expect(() => loadConfig({ ...baseEnv, FX_FIXED_RATES: "not-json" })).toThrow(ConfigError);
   });
 });

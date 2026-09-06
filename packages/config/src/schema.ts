@@ -11,6 +11,35 @@ const logLevel = z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).de
 const boolish = z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1");
 const port = z.coerce.number().int().positive().max(65535);
 const posInt = z.coerce.number().int().positive();
+const ratio = z.coerce.number().positive().max(1);
+/** Objet `{ USD: 1.08, ... }` fourni en JSON dans une variable d'environnement. */
+const jsonRates = z
+  .string()
+  .optional()
+  .transform((raw, ctx): Record<string, number> => {
+    const trimmed = raw?.trim();
+    if (!trimmed) return {};
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "JSON de taux de change invalide" });
+      return z.NEVER;
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "objet de taux attendu" });
+      return z.NEVER;
+    }
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== "number" || !(value > 0)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `taux invalide pour ${key}` });
+        return z.NEVER;
+      }
+      out[key.toUpperCase()] = value;
+    }
+    return out;
+  });
 /** Secret optionnel : une chaîne vide dans `.env` est traitée comme « non défini ». */
 const optionalSecret = z.preprocess(
   (v) => (v === "" ? undefined : v),
@@ -33,7 +62,15 @@ export const configSchema = z
       .string()
       .regex(/^[A-Z]{3}$/, "attendu un code ISO 4217, ex. EUR")
       .default("EUR"),
-    FX_SOURCE: z.enum(["frankfurter", "ecb", "fixed"]).default("frankfurter"),
+    FX_SOURCE: z.enum(["frankfurter", "fixed"]).default("frankfurter"),
+    FX_FIXED_RATES: jsonRates,
+
+    // Détection de baisses (Phase 4) — seuils configurables (Phase 0 §9).
+    DROP_PCT: ratio.default(0.05),
+    FLASH_DROP_PCT: ratio.default(0.12),
+    FLASH_DROP_ABS_EUR: posInt.default(120),
+    FLASH_WINDOW_MINUTES: posInt.default(90),
+    ANALYTICS_MIN_SAMPLE: posInt.default(30),
 
     // Moteur de recherche / surveillance (Phase 3).
     SCHEDULER_INTERVAL_MS: posInt.default(15_000),
@@ -81,6 +118,14 @@ export const configSchema = z
     currency: {
       base: raw.BASE_CURRENCY,
       fxSource: raw.FX_SOURCE,
+      fixedRates: raw.FX_FIXED_RATES,
+    },
+    detection: {
+      dropPct: raw.DROP_PCT,
+      flashDropPct: raw.FLASH_DROP_PCT,
+      flashDropAbsCents: raw.FLASH_DROP_ABS_EUR * 100,
+      flashWindowMinutes: raw.FLASH_WINDOW_MINUTES,
+      analyticsMinSample: raw.ANALYTICS_MIN_SAMPLE,
     },
     engine: {
       schedulerIntervalMs: raw.SCHEDULER_INTERVAL_MS,

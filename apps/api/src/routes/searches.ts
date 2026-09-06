@@ -2,6 +2,8 @@ import {
   createSearch,
   deleteSearch,
   getSearch,
+  listObservationsForAnalytics,
+  listPriceEventsForSearch,
   listSearches,
   listSearchFlights,
   listSnapshotsForSearch,
@@ -12,6 +14,7 @@ import {
   type Database,
   type SearchRow,
 } from "@fbr/database";
+import { buildAnalyticsReport, type PriceObservation } from "@fbr/analytics";
 import { enqueueSearchRun, type Queue, type SearchRunJobData } from "@fbr/queue";
 import { generateDateCombinations } from "@fbr/search-engine";
 import { type Logger } from "@fbr/shared";
@@ -22,6 +25,7 @@ export interface SearchRoutesDeps {
   readonly db: Database;
   readonly queue?: Queue<SearchRunJobData>;
   readonly logger: Logger;
+  readonly analyticsMinSample: number;
 }
 
 const toDto = (row: SearchRow) => ({
@@ -178,10 +182,55 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
         flightOfferId: s.flightOfferId,
         provider: s.provider,
         priceCents: s.priceCents,
+        priceEurCents: s.priceEurCents,
         currency: s.currency,
         availability: s.availability,
         status: s.status,
         observedAt: s.observedAt.toISOString(),
+      })),
+    };
+  });
+
+  app.get("/api/searches/:id/analytics", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const rows = await listObservationsForAnalytics(db, id);
+    const observations: PriceObservation[] = rows.map((o) => ({
+      priceEurCents: o.priceEurCents,
+      observedAt: o.observedAt.toISOString(),
+      outboundDate: o.outboundDate,
+      returnDate: o.returnDate,
+      tripDays: o.tripDays,
+      marketingAirline: o.marketingAirline,
+      maxStops: o.maxStops,
+    }));
+    return buildAnalyticsReport(observations, {
+      minSampleSize: deps.analyticsMinSample,
+      overallMinSampleSize: deps.analyticsMinSample,
+    });
+  });
+
+  app.get("/api/searches/:id/events", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const query = request.query as { limit?: string };
+    const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
+    const events = await listPriceEventsForSearch(db, id, { limit });
+    return {
+      events: events.map((e) => ({
+        id: e.id,
+        flightOfferId: e.flightOfferId,
+        type: e.type,
+        previousPriceEurCents: e.previousPriceEurCents,
+        newPriceEurCents: e.newPriceEurCents,
+        dropAmountEurCents: e.dropAmountEurCents,
+        dropPct: e.dropPct,
+        confirmed: e.confirmed,
+        detectedAt: e.detectedAt.toISOString(),
+        resolvedAt: e.resolvedAt?.toISOString() ?? null,
+        durationSeconds: e.durationSeconds,
       })),
     };
   });

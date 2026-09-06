@@ -61,7 +61,18 @@ Dernière observation **par offre** pour la recherche (`DISTINCT ON`), triée pa
 ### `GET /api/searches/:id/prices?limit=500` → `{ prices: [...] }`
 
 Historique brut des snapshots (append-only), le plus récent d'abord :
-`{ id, flightOfferId, provider, priceCents, currency, availability, status, observedAt }`.
+`{ id, flightOfferId, provider, priceCents, priceEurCents, currency, availability, status, observedAt }`.
+
+### `GET /api/searches/:id/analytics` → `AnalyticsReport`
+
+`buildAnalyticsReport` sur toutes les observations `price_eur_cents` de la recherche (devise unique EUR) :
+`{ currency: "EUR", sampleSize, reliable, summary, trend, best, latest, byMonth[], byDayOfWeek[], byTripDuration[], byAirline[], byStops[], bestMonth }`.
+Chaque groupe porte `reliable` (échantillon suffisant ou non). Voir [`ANALYTICS.md`](ANALYTICS.md).
+
+### `GET /api/searches/:id/events?limit=200` → `{ events: [...] }`
+
+`price_events` dérivés, le plus récent d'abord :
+`{ id, flightOfferId, type, previousPriceEurCents, newPriceEurCents, dropAmountEurCents, dropPct, confirmed, detectedAt, resolvedAt, durationSeconds }`.
 
 ## `SearchDto`
 

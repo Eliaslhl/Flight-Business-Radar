@@ -6,7 +6,9 @@ import {
   createSearchWorker,
   type SearchJob,
 } from "@fbr/queue";
+import { DEFAULT_DROP_THRESHOLDS } from "@fbr/analytics";
 import { createLogger, LogEvent } from "@fbr/shared";
+import { buildFxService } from "./fx.js";
 import { buildProviderRegistry } from "./providers.js";
 import { createScheduler } from "./scheduler.js";
 import { processSearchRun, type SearchProcessorDeps } from "./search-processor.js";
@@ -18,6 +20,7 @@ const db = createDatabase({ url: config.database.url });
 const connection = createQueueConnection(config.redis.url);
 const queue = createSearchQueue(connection);
 const registry = buildProviderRegistry(config, logger);
+const fx = buildFxService(config, db.db);
 
 const processorDeps: SearchProcessorDeps = {
   db: db.db,
@@ -25,6 +28,15 @@ const processorDeps: SearchProcessorDeps = {
   logger,
   combinationsPerRun: config.engine.combinationsPerRun,
   providerMinIntervalSeconds: config.engine.providerMinIntervalSeconds,
+  thresholds: {
+    ...DEFAULT_DROP_THRESHOLDS,
+    priceDropPct: config.detection.dropPct,
+    flashDropPct: config.detection.flashDropPct,
+    flashDropAbsCents: config.detection.flashDropAbsCents,
+    flashWindowMinutes: config.detection.flashWindowMinutes,
+    unusualMinSample: config.detection.analyticsMinSample,
+  },
+  toBaseCents: (cents, currency) => fx.toBaseCents(cents, currency),
 };
 
 const worker = createSearchWorker((job: SearchJob) => processSearchRun(processorDeps, job.data), {
