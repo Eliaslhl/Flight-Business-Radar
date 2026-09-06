@@ -6,19 +6,19 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 
 ## État d'avancement
 
-| Phase | Contenu                                                                                    | Statut       |
-| ----- | ------------------------------------------------------------------------------------------ | ------------ |
-| 0     | Discovery : audit, providers, architecture, schéma, roadmap                                | ✅ Terminée  |
-| 1     | Foundation : monorepo, TS strict, lint/format, tests, PostgreSQL/Redis, config, Docker, CI | ✅ Terminée  |
-| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer          | ✅ Terminée  |
-| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                 | ✅ Terminée  |
-| 4     | Price history : snapshots, statistiques, tendances, détection d'événements, FX             | ✅ Terminée  |
-| 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation             | ✅ Terminée  |
-| 6     | Frontend : dashboard Next.js, graphiques, alertes                                          | ✅ Terminée  |
-| 7     | Real providers : SerpApi puis Duffel                                                       | 🟢 Prochaine |
-| 8     | Notifications : email, Telegram, push                                                      | ⏳           |
-| 9     | Smart recommendations : opportunity score, dates, Radar                                    | ⏳           |
-| 10    | AI Advisor                                                                                 | ⏳           |
+| Phase | Contenu                                                                                          | Statut       |
+| ----- | ------------------------------------------------------------------------------------------------ | ------------ |
+| 0     | Discovery : audit, providers, architecture, schéma, roadmap                                      | ✅ Terminée  |
+| 1     | Foundation : monorepo, TS strict, lint/format, tests, PostgreSQL/Redis, config, Docker, CI       | ✅ Terminée  |
+| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer                | ✅ Terminée  |
+| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                       | ✅ Terminée  |
+| 4     | Price history : snapshots, statistiques, tendances, détection d'événements, FX                   | ✅ Terminée  |
+| 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation                   | ✅ Terminée  |
+| 6     | Frontend : dashboard Next.js, graphiques, alertes                                                | ✅ Terminée  |
+| 7     | Real providers : sidecar Python `fast-flights` (fixture + live best-effort), `provider_requests` | ✅ Terminée  |
+| 8     | Notifications : email, Telegram, push                                                            | 🟢 Prochaine |
+| 9     | Smart recommendations : opportunity score, dates, Radar                                          | ⏳           |
+| 10    | AI Advisor                                                                                       | ⏳           |
 
 ## Prérequis
 
@@ -48,6 +48,19 @@ pnpm --filter @fbr/worker dev
 pnpm --filter @fbr/web dev      # http://localhost:3000  (proxy /api → API)
 ```
 
+### Données de vol réelles (optionnel, Phase 7)
+
+Par défaut le worker utilise `MockFlightProvider`. Pour brancher des vols réels
+(gratuit, 100 % local) via le sidecar Python `fast-flights` :
+
+```bash
+docker compose --profile scraper up -d flight-scraper   # http://localhost:8000
+echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env    # puis relancer le worker
+```
+
+Modes du sidecar : `fixture` (défaut, fiable) / `live` (best-effort — voir
+[`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md)).
+
 ## Structure
 
 ```
@@ -59,7 +72,7 @@ packages/
   shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
   config/           chargement + validation d'environnement (Zod, fail-fast)
   flight-domain/    FlightSearchRequest, FlightOffer, value objects, fingerprint
-  flight-providers/ interface FlightProvider, ProviderRegistry, MockFlightProvider
+  flight-providers/ interface FlightProvider, ProviderRegistry, Mock/Fixture/FastFlights providers
   normalizer/       contrôle qualité + déduplication des offres
   search-engine/    génération de dates, priorité, surveillance adaptative (pur)
   analytics/        stats, tendance, dérivation des price_events (pur)
@@ -68,6 +81,8 @@ packages/
   notifications/    NotificationChannel + ConsoleChannel + NotificationService
   queue/            BullMQ + Redis (file `search`, worker)
   database/         schéma Drizzle + client postgres.js + migrations + repositories
+services/
+  flight-scraper/   sidecar Python (FastAPI) isolant le scraper Google Flights `fast-flights`
 docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
 ```
 

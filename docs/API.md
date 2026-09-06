@@ -79,6 +79,12 @@ Chaque groupe porte `reliable` (échantillon suffisant ou non). Voir [`ANALYTICS
 Historique des notifications diffusées, le plus récent d'abord :
 `{ id, alertId, priceEventId, channel, status, subject, body, dedupeKey, createdAt, sentAt, error }`.
 
+### `GET /api/searches/:id/provider-requests?limit=200&provider=<name>` → `{ providerRequests: [...] }`
+
+Journal des appels providers émis par le worker pour cette recherche (succès **ou** échec), le plus récent d'abord :
+`{ id, provider, ok, offerCount, latencyMs, errorCode, errorMessage, createdAt }`.
+`provider` filtre optionnel (`fast-flights`, `mock`, …). Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md).
+
 ## Alertes
 
 | Route                                                                                     | Réponse                                                      |

@@ -1,0 +1,92 @@
+[
+  {
+    "priceCents": 138900,
+    "totalStops": 0,
+    "isBest": true,
+    "bookingUrl": null,
+    "outbound": {
+      "_baseDate": "2026-11-10",
+      "airlineName": "Air France",
+      "airlineCode": "AF",
+      "flightNumbers": ["AF276"],
+      "departureAt": "2026-11-10T13:30:00+00:00",
+      "arrivalAt": "2026-11-11T09:15:00+00:00",
+      "durationMinutes": 705,
+      "stops": 0,
+      "fromCode": "CDG",
+      "toCode": "HND"
+    },
+    "inbound": {
+      "_baseDate": "2026-11-20",
+      "airlineName": "Air France",
+      "airlineCode": "AF",
+      "flightNumbers": ["AF275"],
+      "departureAt": "2026-11-20T11:00:00+00:00",
+      "arrivalAt": "2026-11-20T16:30:00+00:00",
+      "durationMinutes": 800,
+      "stops": 0,
+      "fromCode": "HND",
+      "toCode": "CDG"
+    }
+  },
+  {
+    "priceCents": 152000,
+    "totalStops": 1,
+    "isBest": false,
+    "bookingUrl": null,
+    "outbound": {
+      "_baseDate": "2026-11-10",
+      "airlineName": "Lufthansa",
+      "airlineCode": "LH",
+      "flightNumbers": [],
+      "departureAt": "2026-11-10T07:05:00+00:00",
+      "arrivalAt": "2026-11-11T10:40:00+00:00",
+      "durationMinutes": 935,
+      "stops": 1,
+      "fromCode": "CDG",
+      "toCode": "HND"
+    },
+    "inbound": {
+      "_baseDate": "2026-11-20",
+      "airlineName": "Lufthansa",
+      "airlineCode": "LH",
+      "flightNumbers": [],
+      "departureAt": "2026-11-20T12:20:00+00:00",
+      "arrivalAt": "2026-11-20T21:10:00+00:00",
+      "durationMinutes": 990,
+      "stops": 1,
+      "fromCode": "HND",
+      "toCode": "CDG"
+    }
+  },
+  {
+    "priceCents": 167400,
+    "totalStops": 1,
+    "isBest": false,
+    "bookingUrl": null,
+    "outbound": {
+      "_baseDate": "2026-11-10",
+      "airlineName": "Qatar Airways",
+      "airlineCode": "QR",
+      "flightNumbers": [],
+      "departureAt": "2026-11-10T21:40:00+00:00",
+      "arrivalAt": "2026-11-11T18:05:00+00:00",
+      "durationMinutes": 1225,
+      "stops": 1,
+      "fromCode": "CDG",
+      "toCode": "HND"
+    },
+    "inbound": {
+      "_baseDate": "2026-11-20",
+      "airlineName": "Qatar Airways",
+      "airlineCode": "QR",
+      "flightNumbers": [],
+      "departureAt": "2026-11-20T17:30:00+00:00",
+      "arrivalAt": "2026-11-21T14:55:00+00:00",
+      "durationMinutes": 1225,
+      "stops": 1,
+      "fromCode": "HND",
+      "toCode": "CDG"
+    }
+  }
+]

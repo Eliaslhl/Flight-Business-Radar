@@ -193,6 +193,20 @@ suite("API /api/searches (intégration Postgres)", () => {
     expect(res.json<{ notifications: unknown[] }>().notifications).toEqual([]);
   });
 
+  it("/provider-requests part vide pour une recherche fraîche puis 404 si inconnue", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({ method: "GET", url: `/api/searches/${id}/provider-requests` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ providerRequests: unknown[] }>().providerRequests).toEqual([]);
+
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/searches/00000000-0000-0000-0000-0000000000ff/provider-requests",
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it("404 sur une recherche inconnue", async () => {
     const res = await app.inject({
       method: "GET",

@@ -2,4 +2,6 @@
 **/coverage/**
 **/.turbo/**
 **/drizzle/**
+**/.venv/**
+**/__pycache__/**
 pnpm-lock.yaml

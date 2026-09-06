@@ -30,7 +30,7 @@ export const getTestDb = async (): Promise<DbHandle> => {
 };
 
 export const truncateAll = (h: DbHandle): Promise<unknown> =>
-  h.sql`TRUNCATE price_snapshots, offer_provider_links, flight_offers, search_date_combinations, searches RESTART IDENTITY CASCADE`;
+  h.sql`TRUNCATE provider_requests, price_snapshots, offer_provider_links, flight_offers, search_date_combinations, searches RESTART IDENTITY CASCADE`;
 
 export const closeTestDb = async (): Promise<void> => {
   if (lock) {

@@ -91,6 +91,10 @@ export const configSchema = z
       .default("normal"),
 
     // Providers — optionnels tant que non activés (Phase 7+).
+    // Sidecar `fast-flights` (services/flight-scraper) : si défini, le worker
+    // utilise FastFlightsProvider au lieu du MockFlightProvider.
+    FAST_FLIGHTS_URL: z.string().url().optional(),
+    FAST_FLIGHTS_TIMEOUT_MS: posInt.default(20_000),
     SERPAPI_API_KEY: optionalSecret,
     DUFFEL_API_TOKEN: optionalSecret,
 
@@ -135,6 +139,9 @@ export const configSchema = z
       mockScenario: raw.MOCK_SCENARIO,
     },
     providers: {
+      fastFlights: raw.FAST_FLIGHTS_URL
+        ? { url: raw.FAST_FLIGHTS_URL, timeoutMs: raw.FAST_FLIGHTS_TIMEOUT_MS }
+        : null,
       serpapi: raw.SERPAPI_API_KEY ? { apiKey: raw.SERPAPI_API_KEY } : null,
       duffel: raw.DUFFEL_API_TOKEN ? { token: raw.DUFFEL_API_TOKEN } : null,
     },

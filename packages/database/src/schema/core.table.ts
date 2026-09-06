@@ -330,6 +330,27 @@ export const notifications = pgTable(
   ],
 );
 
+// ─── provider_requests (observabilité — Phase 7) ─────────────────────────
+
+export const providerRequests = pgTable(
+  "provider_requests",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    provider: text("provider").notNull(),
+    searchId: uuid("search_id").references(() => searches.id, { onDelete: "set null" }),
+    ok: boolean("ok").notNull(),
+    offerCount: integer("offer_count").notNull().default(0),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("provider_requests_provider_created_idx").on(t.provider, t.createdAt),
+    index("provider_requests_search_created_idx").on(t.searchId, t.createdAt),
+  ],
+);
+
 // ─── relations (pour les requêtes typées `db.query`) ────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -408,3 +429,4 @@ export type AlertRow = typeof alerts.$inferSelect;
 export type NewAlertRow = typeof alerts.$inferInsert;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type NewNotificationRow = typeof notifications.$inferInsert;
+export type ProviderRequestRow = typeof providerRequests.$inferSelect;

@@ -8,6 +8,8 @@ import {
   upsertOffer,
   upsertProviderLink,
   insertSnapshots,
+  insertProviderRequests,
+  type ProviderRequestInput,
   type Database,
   type SearchDateCombinationRow,
   type SearchRow,
@@ -193,6 +195,7 @@ export const processSearchRun = async (
 
   const searchLike = toSearchLike(search);
   const allSnapshots: InsertSnapshotInput[] = [];
+  const providerRequestRows: ProviderRequestInput[] = [];
   const offersById = new Map<string, FlightOffer>();
   let offersKept = 0;
   let providerErrors = 0;
@@ -202,6 +205,17 @@ export const processSearchRun = async (
     const request = buildRequestForCombination(searchLike, combo);
     const { offers, outcomes } = await deps.registry.searchAll(request);
     providerErrors += outcomes.filter((o) => !o.ok).length;
+    for (const outcome of outcomes) {
+      providerRequestRows.push({
+        provider: outcome.provider,
+        searchId: search.id,
+        ok: outcome.ok,
+        offerCount: outcome.offerCount,
+        latencyMs: outcome.latencyMs,
+        errorCode: outcome.error?.code ?? null,
+        errorMessage: outcome.error?.message ?? null,
+      });
+    }
 
     const normalized = normalizeSearchResults(request, offers, { baseCurrency: search.currency });
     offersKept += normalized.offers.length;
@@ -217,6 +231,7 @@ export const processSearchRun = async (
   }
 
   const snapshotsInserted = await insertSnapshots(deps.db, allSnapshots);
+  await insertProviderRequests(deps.db, providerRequestRows);
   await markCombinationsChecked(
     deps.db,
     picked.map((c) => c.id),

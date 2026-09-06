@@ -32,6 +32,16 @@ describe("loadConfig", () => {
     expect(cfg.providers.serpapi).toEqual({ apiKey: "key-123" });
   });
 
+  it("structure providers.fastFlights depuis FAST_FLIGHTS_URL", () => {
+    expect(loadConfig({ ...baseEnv }).providers.fastFlights).toBeNull();
+    const cfg = loadConfig({
+      ...baseEnv,
+      FAST_FLIGHTS_URL: "http://localhost:8000",
+      FAST_FLIGHTS_TIMEOUT_MS: "5000",
+    });
+    expect(cfg.providers.fastFlights).toEqual({ url: "http://localhost:8000", timeoutMs: 5000 });
+  });
+
   it("lève ConfigError listant les variables invalides", () => {
     try {
       loadConfig({ DATABASE_URL: "mysql://x", REDIS_URL: "redis://localhost" });
