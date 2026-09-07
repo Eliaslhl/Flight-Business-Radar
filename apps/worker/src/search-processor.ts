@@ -28,6 +28,7 @@ import { normalizeSearchResults } from "@fbr/normalizer";
 import { type SearchRunJobData } from "@fbr/queue";
 import {
   buildRequestForCombination,
+  buildWindowRequest,
   computeNextIntervalSeconds,
   computeSearchPriority,
   generateDateCombinations,
@@ -124,7 +125,11 @@ const persistOffers = async (
       cabinClass: offer.cabinClass,
       outboundDate: offer.outbound.departureDate,
       returnDate: offer.inbound?.departureDate ?? null,
-      tripDays: combo.tripDays,
+      // Durée réelle de l'offre (une source « panorama mensuel » renvoie des
+      // couples de dates ≠ du combo) ; repli sur le combo si aller simple.
+      tripDays: offer.inbound
+        ? daysBetween(offer.outbound.departureDate, offer.inbound.departureDate)
+        : combo.tripDays,
       marketingAirline: offer.outbound.marketingAirline,
       maxStops: offerMaxStops(offer),
       payload: offer,
@@ -228,6 +233,15 @@ export const processSearchRun = async (
   let providerErrors = 0;
   let bestPriceCents: number | null = null;
 
+  // Les providers « devis exact » (SerpApi, Duffel, scraper) sont interrogés sur
+  // le couple de dates précis du combo ; mais une source qui balaie le mois
+  // (Travelpayouts) renvoie d'autres dates de la fenêtre. On valide donc contre
+  // la fenêtre complète de la recherche — surensemble : aucune régression pour
+  // les offres déjà pile sur la date demandée.
+  const validationRequest = radarSlice
+    ? buildWindowRequest(searchLike, { destinations: radarSlice })
+    : buildWindowRequest(searchLike);
+
   for (const combo of combosToRun) {
     const request = radarSlice
       ? buildRequestForCombination(searchLike, combo, { destinations: radarSlice })
@@ -246,7 +260,9 @@ export const processSearchRun = async (
       });
     }
 
-    const normalized = normalizeSearchResults(request, offers, { baseCurrency: search.currency });
+    const normalized = normalizeSearchResults(validationRequest, offers, {
+      baseCurrency: search.currency,
+    });
     offersKept += normalized.offers.length;
 
     for (const offer of normalized.offers) {
