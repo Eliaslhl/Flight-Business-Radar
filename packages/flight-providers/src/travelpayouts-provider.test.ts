@@ -114,10 +114,13 @@ describe("TravelpayoutsProvider", () => {
     await new TravelpayoutsProvider({ token: "tp-tok", fetchImpl }).searchFlights(
       request({ cabinClass: "BUSINESS" }),
     );
-    const url = new URL((fetchImpl.mock.calls[0] as [string])[0]);
+    const call = fetchImpl.mock.calls[0] as [string, { headers: Record<string, string> }];
+    const url = new URL(call[0]);
     expect(url.origin + url.pathname).toBe("https://api.travelpayouts.com/v2/prices/latest");
+    // Jeton en en-tête (plus en query param depuis le durcissement de la Data API).
+    expect(call[1].headers["x-access-token"]).toBe("tp-tok");
     const q = url.searchParams;
-    expect(q.get("token")).toBe("tp-tok");
+    expect(q.get("token")).toBeNull();
     expect(q.get("origin")).toBe("CDG");
     expect(q.get("destination")).toBe("JFK");
     expect(q.get("period_type")).toBe("month");
