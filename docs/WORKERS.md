@@ -74,20 +74,21 @@ Départ imminent (`daysUntilDeparture ≤ 10`) → resserre d'un cran. Jitter ±
 
 ## Configuration (`.env`)
 
-| Variable                                                                      | Défaut                 | Rôle                                                                    |
-| ----------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
-| `SCHEDULER_INTERVAL_MS`                                                       | 15000                  | Période de scan des recherches dues                                     |
-| `SEARCH_WORKER_CONCURRENCY`                                                   | 4                      | Jobs `search.run` traités en parallèle                                  |
-| `SEARCH_COMBINATIONS_PER_RUN`                                                 | 6                      | Combinaisons sondées par exécution                                      |
-| `RADAR_BATCH_SIZE`                                                            | 8                      | Mode Radar : destinations seed sondées par run (tranche rotative)       |
-| `PROVIDER_MIN_INTERVAL_SECONDS`                                               | 60                     | Plancher d'intervalle (rate limit provider)                             |
-| `MOCK_SCENARIO`                                                               | normal                 | Scénario du `MockFlightProvider` (si `FAST_FLIGHTS_URL` absent)         |
-| `FAST_FLIGHTS_URL`                                                            | _(vide)_               | URL du sidecar `services/flight-scraper` → active `FastFlightsProvider` |
-| `FAST_FLIGHTS_TIMEOUT_MS`                                                     | 20000                  | Timeout par appel au sidecar                                            |
-| `FX_SOURCE` / `FX_FIXED_RATES`                                                | frankfurter            | Source des taux de change / taux fixes JSON                             |
-| `DROP_PCT` / `FLASH_DROP_PCT` / `FLASH_DROP_ABS_EUR` / `FLASH_WINDOW_MINUTES` | 0.05 / 0.12 / 120 / 90 | Seuils de détection de baisse                                           |
-| `ANALYTICS_MIN_SAMPLE`                                                        | 30                     | Échantillon minimal (`UNUSUAL`, fiabilité)                              |
-| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`                                     | _(vide)_               | Active le canal `TELEGRAM` (les deux requis)                            |
-| `SMTP_URL` + `EMAIL_FROM` + `EMAIL_TO`                                        | _(vide)_               | Active le canal `EMAIL` (SMTP `nodemailer`, les trois requis)           |
-| `NOTIFICATION_WEBHOOK_URL`                                                    | _(vide)_               | Active le canal `WEBHOOK` (POST JSON — Discord / Slack / ntfy / custom) |
-| `NOTIFICATION_TIMEOUT_MS` / `NOTIFICATION_MAX_ATTEMPTS`                       | 10000 / 3              | Timeout dur et nombre de tentatives par canal réseau                    |
+| Variable                                                                      | Défaut                 | Rôle                                                                                                                |
+| ----------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `SCHEDULER_INTERVAL_MS`                                                       | 15000                  | Période de scan des recherches dues                                                                                 |
+| `SEARCH_WORKER_CONCURRENCY`                                                   | 4                      | Jobs `search.run` traités en parallèle                                                                              |
+| `SEARCH_COMBINATIONS_PER_RUN`                                                 | 6                      | Combinaisons sondées par exécution                                                                                  |
+| `RADAR_BATCH_SIZE`                                                            | 8                      | Mode Radar : destinations seed sondées par run (tranche rotative)                                                   |
+| `PROVIDER_MIN_INTERVAL_SECONDS`                                               | 60                     | Plancher d'intervalle (rate limit provider)                                                                         |
+| `MOCK_SCENARIO`                                                               | normal                 | Scénario du `MockFlightProvider` (si aucun provider réel configuré)                                                 |
+| `SERPAPI_API_KEY` (+ `SERPAPI_TIMEOUT_MS`, `SERPAPI_MAX_DESTINATIONS`)        | _(vide)_               | Active `SerpApiFlightProvider` (payant — 1 recherche = 1 crédit). Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md) |
+| `FAST_FLIGHTS_URL`                                                            | _(vide)_               | URL du sidecar `services/flight-scraper` → active `FastFlightsProvider`                                             |
+| `FAST_FLIGHTS_TIMEOUT_MS`                                                     | 20000                  | Timeout par appel au sidecar                                                                                        |
+| `FX_SOURCE` / `FX_FIXED_RATES`                                                | frankfurter            | Source des taux de change / taux fixes JSON                                                                         |
+| `DROP_PCT` / `FLASH_DROP_PCT` / `FLASH_DROP_ABS_EUR` / `FLASH_WINDOW_MINUTES` | 0.05 / 0.12 / 120 / 90 | Seuils de détection de baisse                                                                                       |
+| `ANALYTICS_MIN_SAMPLE`                                                        | 30                     | Échantillon minimal (`UNUSUAL`, fiabilité)                                                                          |
+| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`                                     | _(vide)_               | Active le canal `TELEGRAM` (les deux requis)                                                                        |
+| `SMTP_URL` + `EMAIL_FROM` + `EMAIL_TO`                                        | _(vide)_               | Active le canal `EMAIL` (SMTP `nodemailer`, les trois requis)                                                       |
+| `NOTIFICATION_WEBHOOK_URL`                                                    | _(vide)_               | Active le canal `WEBHOOK` (POST JSON — Discord / Slack / ntfy / custom)                                             |
+| `NOTIFICATION_TIMEOUT_MS` / `NOTIFICATION_MAX_ATTEMPTS`                       | 10000 / 3              | Timeout dur et nombre de tentatives par canal réseau                                                                |

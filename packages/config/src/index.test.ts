@@ -29,7 +29,11 @@ describe("loadConfig", () => {
     expect(cfg.isProduction).toBe(true);
     expect(cfg.api.port).toBe(8080);
     expect(cfg.log.pretty).toBe(true);
-    expect(cfg.providers.serpapi).toEqual({ apiKey: "key-123" });
+    expect(cfg.providers.serpapi).toEqual({
+      apiKey: "key-123",
+      timeoutMs: 20_000,
+      maxDestinations: 8,
+    });
   });
 
   it("structure providers.fastFlights depuis FAST_FLIGHTS_URL", () => {

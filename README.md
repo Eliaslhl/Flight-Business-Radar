@@ -48,18 +48,21 @@ pnpm --filter @fbr/worker dev
 pnpm --filter @fbr/web dev      # http://localhost:3000  (proxy /api → API)
 ```
 
-### Données de vol réelles (optionnel, Phase 7)
+### Données de vol réelles (optionnel)
 
-Par défaut le worker utilise `MockFlightProvider`. Pour brancher des vols réels
-(gratuit, 100 % local) via le sidecar Python `fast-flights` :
+Par défaut le worker utilise `MockFlightProvider`. Deux providers réels, activés par
+simple présence de config (les deux peuvent tourner en parallèle) :
 
 ```bash
+# Gratuit, 100 % local — sidecar Python fast-flights (best-effort)
 docker compose --profile scraper up -d flight-scraper   # http://localhost:8000
-echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env    # puis relancer le worker
+echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env
+
+# Payant — SerpApi Google Flights (1 recherche = 1 crédit)
+echo "SERPAPI_API_KEY=…" >> .env
 ```
 
-Modes du sidecar : `fixture` (défaut, fiable) / `live` (best-effort — voir
-[`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md)).
+Détails, coûts et garde-fous : [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md).
 
 ### Notifications (optionnel, Phase 8)
 
