@@ -1,5 +1,6 @@
 import { type AppConfig } from "@fbr/config";
 import {
+  DuffelFlightProvider,
   FastFlightsProvider,
   MockFlightProvider,
   ProviderRegistry,
@@ -48,4 +49,24 @@ export const buildProviderRegistry = (config: AppConfig, logger: Logger): Provid
     "providers actifs",
   );
   return new ProviderRegistry(providers, { logger });
+};
+
+/**
+ * Oracle de confirmation (Phase 0 §10) : si `DUFFEL_API_TOKEN` est défini, le
+ * pipeline d'alerte valide les baisses exceptionnelles contre du contenu Duffel
+ * réellement réservable au lieu de re-requêter le provider de recherche.
+ * `null` sinon (confirmation via les providers de recherche, comportement Phase 5).
+ */
+export const buildConfirmationOracle = (
+  config: AppConfig,
+  logger: Logger,
+): FlightProvider | null => {
+  if (!config.providers.duffel) return null;
+  logger.info({ event: "confirm_oracle_configured", oracle: "duffel" }, "oracle Duffel actif");
+  return new DuffelFlightProvider({
+    token: config.providers.duffel.token,
+    timeoutMs: config.providers.duffel.timeoutMs,
+    maxDestinations: config.providers.duffel.maxDestinations,
+    logger,
+  });
 };

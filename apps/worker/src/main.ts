@@ -11,7 +11,7 @@ import { createLogger, LogEvent } from "@fbr/shared";
 import { buildConfirmer } from "./confirmer.js";
 import { buildFxService } from "./fx.js";
 import { buildNotificationService } from "./notifications.js";
-import { buildProviderRegistry } from "./providers.js";
+import { buildConfirmationOracle, buildProviderRegistry } from "./providers.js";
 import { createScheduler } from "./scheduler.js";
 import { processSearchRun, type SearchProcessorDeps } from "./search-processor.js";
 
@@ -22,6 +22,7 @@ const db = createDatabase({ url: config.database.url });
 const connection = createQueueConnection(config.redis.url);
 const queue = createSearchQueue(connection);
 const registry = buildProviderRegistry(config, logger);
+const confirmationOracle = buildConfirmationOracle(config, logger);
 const fx = buildFxService(config, db.db);
 const notificationService = buildNotificationService(config, logger);
 
@@ -42,7 +43,10 @@ const processorDeps: SearchProcessorDeps = {
   },
   toBaseCents: (cents, currency) => fx.toBaseCents(cents, currency),
   notificationService,
-  confirm: buildConfirmer(registry, fx),
+  confirm: buildConfirmer(registry, fx, {
+    ...(confirmationOracle ? { oracle: confirmationOracle } : {}),
+    logger,
+  }),
 };
 
 const worker = createSearchWorker((job: SearchJob) => processSearchRun(processorDeps, job.data), {

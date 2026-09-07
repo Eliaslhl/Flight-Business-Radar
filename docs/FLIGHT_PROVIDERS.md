@@ -34,25 +34,28 @@ La déduplication inter-providers est faite ensuite par `@fbr/normalizer`.
 
 ## Providers implémentés
 
-| Provider                | Statut         | Notes                                                                                                                            |
-| ----------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `MockFlightProvider`    | ✅ Phase 2     | Provider de test déterministe. Aucune I/O.                                                                                       |
-| `FixtureFlightProvider` | ✅ Phase 7     | Rejoue des `FlightOffer` canoniques (tests, CI, démo hors-ligne). Aucune I/O.                                                    |
-| `FastFlightsProvider`   | ✅ Phase 7     | Client HTTP du sidecar `services/flight-scraper` (Google Flights via `fast-flights`). Actif quand `FAST_FLIGHTS_URL` est défini. |
-| `SerpApiFlightProvider` | ✅             | **Provider réel payant** (SerpApi Google Flights). Actif quand `SERPAPI_API_KEY` est défini. 1 recherche = 1 crédit SerpApi.     |
-| Duffel                  | ⏳ (au besoin) | Oracle de confirmation des flash drops + lien de réservation.                                                                    |
+| Provider                | Statut     | Notes                                                                                                                                                              |
+| ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MockFlightProvider`    | ✅ Phase 2 | Provider de test déterministe. Aucune I/O.                                                                                                                         |
+| `FixtureFlightProvider` | ✅ Phase 7 | Rejoue des `FlightOffer` canoniques (tests, CI, démo hors-ligne). Aucune I/O.                                                                                      |
+| `FastFlightsProvider`   | ✅ Phase 7 | Client HTTP du sidecar `services/flight-scraper` (Google Flights via `fast-flights`). Actif quand `FAST_FLIGHTS_URL` est défini.                                   |
+| `SerpApiFlightProvider` | ✅         | **Provider réel payant** (SerpApi Google Flights). Actif quand `SERPAPI_API_KEY` est défini. 1 recherche = 1 crédit SerpApi.                                       |
+| `DuffelFlightProvider`  | ✅         | **Payant — oracle de confirmation** (contenu réservable NDC/GDS). Actif quand `DUFFEL_API_TOKEN` est défini. Hors `ProviderRegistry` : branché sur le `confirmer`. |
 
 ### Composition (`apps/worker/src/providers.ts`)
 
-`buildProviderRegistry` compose la liste **par présence de config** (Phase 0 §5 — jamais de
-dépendance à un seul fournisseur) :
+`buildProviderRegistry` compose la liste de **recherche** par présence de config (Phase 0
+§5 — jamais de dépendance à un seul fournisseur) :
 
-| Config présente    | Providers actifs                                                |
+| Config présente    | Providers de recherche actifs                                   |
 | ------------------ | --------------------------------------------------------------- |
 | `SERPAPI_API_KEY`  | `serpapi`                                                       |
 | `FAST_FLIGHTS_URL` | `fast-flights`                                                  |
 | les deux           | `serpapi` + `fast-flights` (parallèle, dédup par le normalizer) |
 | aucun              | `mock`                                                          |
+
+`buildConfirmationOracle` renvoie en plus un `DuffelFlightProvider` (ou `null`) — utilisé
+**uniquement** par le `confirmer` du pipeline d'alerte, pas dans la recherche.
 
 ## `FastFlightsProvider` + sidecar `services/flight-scraper` (Phase 7)
 
@@ -169,6 +172,54 @@ juridique / Business Class). `engine=google_flights`, `travel_class=3`.
 | `SERPAPI_API_KEY`          | _(vide)_ | Active le provider. **Secret — jamais committé.**              |
 | `SERPAPI_TIMEOUT_MS`       | 20000    | Timeout par appel                                              |
 | `SERPAPI_MAX_DESTINATIONS` | 8        | Plafond de destinations interrogées par run (garde-fou budget) |
+
+## `DuffelFlightProvider` — oracle de confirmation (payant)
+
+Duffel (API v2) fournit du contenu **NDC/GDS réellement réservable**. Rôle retenu
+(Phase 0 §2 / §10) : **oracle de confirmation** des baisses exceptionnelles, indépendant du
+provider de recherche.
+
+### Rôle dans le pipeline
+
+Le confirmer (`apps/worker/src/confirmer.ts`) devient `buildConfirmer(registry, fx, { oracle })` :
+
+```
+needsConfirmation(alertType)   // FLASH_DROP / RECORD_LOW / UNUSUAL_PRICE
+  └─ oracle Duffel présent ?
+       ├─ oui → interroge Duffel (contenu réservable) → rechecks avec availability=AVAILABLE
+       │         └─ échec Duffel (401/429/5xx/timeout) → log confirm_oracle_failed
+       │                                                 → repli sur les providers de recherche
+       └─ non → re-requête les providers de recherche (comportement Phase 5)
+```
+
+Sans oracle, `isPriceConfirmed` exige `availability ∈ {AVAILABLE, LOW}` — que les providers
+de scraping/SerpApi ne fournissent pas (`UNKNOWN`). Duffel lève cette limite : une offre
+Duffel = du réservable, donc `AVAILABLE`.
+
+### Requête
+
+`POST /air/offer_requests?return_offers=true` (en-tête `Duffel-Version: v2`,
+`Authorization: Bearer <token>`) — 2 slices (aller + retour), `cabin_class: business`,
+`max_connections` mappé depuis `maxStops`. **Un `offer_request` = une facturation Duffel.**
+
+### Conversion & robustesse
+
+- `data.offers[]` → `FlightOffer` : `total_amount` (chaîne décimale) → centimes ; aller **et
+  retour** détaillés (Duffel renvoie les 2 slices) ; `duration` ISO 8601 (`PT13H40M`) →
+  minutes ; `marketing_carrier.iata_code` + `marketing_carrier_flight_number` → `AF276` ;
+  horaires locaux → ISO nominal (`…Z`).
+- `401` / `429` → `ProviderError` **non-retryable** ; `5xx` → retryable ; timeout / réseau
+  → `PROVIDER_TIMEOUT` ; aucune offre → `[]`.
+- Sandbox (`duffel_test_…`) : offres factices « Duffel Airways ». Live (`duffel_live_…`) :
+  contenu réel, compte vérifié requis.
+
+### Config (`.env`)
+
+| Variable                  | Défaut   | Rôle                                               |
+| ------------------------- | -------- | -------------------------------------------------- |
+| `DUFFEL_API_TOKEN`        | _(vide)_ | Active l'oracle. **Secret — jamais committé.**     |
+| `DUFFEL_TIMEOUT_MS`       | 20000    | Timeout par `offer_request`                        |
+| `DUFFEL_MAX_DESTINATIONS` | 4        | Plafond de destinations par appel (garde-fou coût) |
 
 ## `MockFlightProvider` — scénarios
 
