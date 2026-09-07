@@ -186,6 +186,7 @@ describe("loadConfig", () => {
       schedulerIntervalMs: 15_000,
       searchWorkerConcurrency: 4,
       combinationsPerRun: 6,
+      serpapiCombosPerRun: 1,
       providerMinIntervalSeconds: 60,
       radarBatchSize: 8,
       onceMaxSearches: 100,

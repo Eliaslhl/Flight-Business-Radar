@@ -191,22 +191,24 @@ sur `trip_class`.
 
 ## `SerpApiFlightProvider` — SerpApi Google Flights (payant)
 
-1er provider **réel payant** (Phase 0 §2 — meilleur compromis documenté / couverture
-juridique / Business Class). `engine=google_flights`, `travel_class=3`.
+Provider **réel payant** (Phase 0 §2). `engine=google_flights`. **Réservé aux
+recherches point-à-point (une destination)** : une requête multi-destinations ou
+sans destination (Radar / continent) ⇒ `[]` sans appel réseau — ces cas restent
+sur Travelpayouts. À chaque passage, le provider interroge **3 cabines**
+(`travel_class` 1 / 2 / 3, Éco / Éco+ / Affaires) et renvoie toutes les offres
+taguées de leur cabine ; l'analyse garde les 3 moins chères, cabine mélangée.
 
 ### Coût & garde-fous
 
-- **1 appel HTTP = 1 crédit SerpApi.** Un run de recherche « normale » = 1 crédit
-  (1 destination). Un run **mode Radar** = `RADAR_BATCH_SIZE` crédits (une destination
-  de la tranche seed par crédit).
-- Plafond `SERPAPI_MAX_DESTINATIONS` (défaut 8) : le provider tronque au-delà et loggue
-  un `debug` — protège d'un dépassement de quota accidentel.
-- `HTTP 429` (quota) et `HTTP 401` (clé) → `ProviderError` **non-retryable** (réessayer
-  tout de suite est inutile). `HTTP 5xx` → retryable. Timeout / réseau → `PROVIDER_TIMEOUT`.
-- Surveiller la consommation via `provider_requests` (`provider = "serpapi"`,
-  `latency_ms`, `ok`).
-- La cadence est déjà bornée par la surveillance adaptative
-  (`computeNextIntervalSeconds` + `PROVIDER_MIN_INTERVAL_SECONDS`).
+- **1 appel HTTP = 1 crédit.** 1 passage point-à-point = **3 crédits** (1/cabine).
+- `SERPAPI_COMBINATIONS_PER_RUN` (défaut **1**) : 1 seul couple de dates par
+  passage quand SerpApi est actif.
+- Plancher d'intervalle relevé à **6 h** (`serpapi_budget_interval_floor`) tant
+  que SerpApi est actif → pour 1 route en 6 h : 4 passages/j × 3 = **~360
+  crédits/mois** (large sous le palier Starter à 1 000).
+- `HTTP 429` (quota) / `HTTP 401` (clé) → `ProviderError` **non-retryable** ;
+  `HTTP 5xx` → retryable ; timeout / réseau → `PROVIDER_TIMEOUT`.
+- Consommation à surveiller via `provider_requests` (`provider = "serpapi"`).
 
 ### Conversion
 

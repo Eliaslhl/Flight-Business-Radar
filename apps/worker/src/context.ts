@@ -28,20 +28,27 @@ export const buildProcessorContext = (config: AppConfig, logger: Logger): Proces
   const fx = buildFxService(config, handle.db);
   const notificationService = buildNotificationService(config, logger);
 
-  // Travelpayouts est du cache (~48 h) : sonder plus vite qu'un palier de 3 h ne
-  // sert à rien et grille le quota. On relève le plancher si c'est la seule
-  // source réelle (SerpApi / fast-flights la surclassent en fraîcheur).
+  // Plancher d'intervalle de sondage, selon la source réelle :
+  // - SerpApi actif (payant, 1 appel = 1 crédit, 3 cabines/passage) → 6 h, pour
+  //   tenir le budget mensuel ; les combos sont aussi ramenés à 1 (voir plus bas).
+  // - Travelpayouts seul (cache ~48 h) → 3 h, sonder plus vite ne sert à rien.
+  const serpapiActive = config.providers.serpapi !== null;
   const onlyCachedSource =
+    !serpapiActive &&
     config.providers.travelpayouts !== null &&
-    config.providers.serpapi === null &&
     config.providers.fastFlights === null;
-  const providerMinIntervalSeconds = onlyCachedSource
-    ? Math.max(config.engine.providerMinIntervalSeconds, 10_800)
-    : config.engine.providerMinIntervalSeconds;
-  if (onlyCachedSource) {
+  const providerMinIntervalSeconds = serpapiActive
+    ? Math.max(config.engine.providerMinIntervalSeconds, 21_600)
+    : onlyCachedSource
+      ? Math.max(config.engine.providerMinIntervalSeconds, 10_800)
+      : config.engine.providerMinIntervalSeconds;
+  if (serpapiActive || onlyCachedSource) {
     logger.info(
-      { event: "cached_source_interval_floor", providerMinIntervalSeconds },
-      "source en cache uniquement — plancher d'intervalle relevé",
+      {
+        event: serpapiActive ? "serpapi_budget_interval_floor" : "cached_source_interval_floor",
+        providerMinIntervalSeconds,
+      },
+      "plancher d'intervalle de sondage relevé",
     );
   }
 
@@ -49,6 +56,8 @@ export const buildProcessorContext = (config: AppConfig, logger: Logger): Proces
     db: handle.db,
     registry,
     logger,
+    serpapiActive,
+    serpapiCombosPerRun: config.engine.serpapiCombosPerRun,
     combinationsPerRun: config.engine.combinationsPerRun,
     providerMinIntervalSeconds,
     radarBatchSize: config.engine.radarBatchSize,

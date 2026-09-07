@@ -20,7 +20,7 @@ export interface SerpApiProviderOptions {
   readonly apiKey: string;
   readonly timeoutMs?: number;
   readonly name?: string;
-  /** Garde-fou budget : nombre max de destinations interrogées en un appel (1 recherche SerpApi = 1 crédit). */
+  /** @deprecated SerpApi n'est plus utilisé qu'en point-à-point (une destination). */
   readonly maxDestinations?: number;
   /** `deep_search=true` : prix plus fidèles à Google Flights, réponse plus lente. */
   readonly deepSearch?: boolean;
@@ -32,12 +32,10 @@ export interface SerpApiProviderOptions {
 const BASE_URL = "https://serpapi.com/search.json";
 
 /** `travel_class` SerpApi : 1 Economy · 2 Premium economy · 3 Business · 4 First. */
-const TRAVEL_CLASS: Record<FlightSearchRequest["cabinClass"], string> = {
-  ECONOMY: "1",
-  PREMIUM_ECONOMY: "2",
-  BUSINESS: "3",
-  FIRST: "4",
-};
+const TRAVEL_CLASS = { ECONOMY: "1", PREMIUM_ECONOMY: "2", BUSINESS: "3", FIRST: "4" } as const;
+type CabinClass = FlightSearchRequest["cabinClass"];
+/** Cabines interrogées à chaque passage : on remonte les 3 moins chères, cabine mélangée. */
+const CABINS_QUERIED: readonly CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS"];
 
 /** `stops` SerpApi : 0 indifférent · 1 direct · 2 ≤ 1 escale · 3 ≤ 2 escales. */
 const stopsParam = (maxStops: number): string =>
@@ -73,7 +71,6 @@ export class SerpApiFlightProvider implements FlightProvider {
   readonly name: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
-  private readonly maxDestinations: number;
   private readonly deepSearch: boolean;
   private readonly fetchImpl: FetchLike;
   private readonly now: () => string;
@@ -83,7 +80,6 @@ export class SerpApiFlightProvider implements FlightProvider {
     this.name = options.name ?? "serpapi";
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 20_000;
-    this.maxDestinations = options.maxDestinations ?? 8;
     this.deepSearch = options.deepSearch ?? false;
     this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init));
     this.now = options.now ?? ((): string => new Date().toISOString());
@@ -91,29 +87,28 @@ export class SerpApiFlightProvider implements FlightProvider {
   }
 
   async searchFlights(request: FlightSearchRequest): Promise<FlightOffer[]> {
-    if (request.destinations.length === 0) {
-      throw new ProviderError("serpapi : une destination explicite est requise", {
-        retryable: false,
-      });
-    }
-    let destinations = [...request.destinations];
-    if (destinations.length > this.maxDestinations) {
+    // Garde-fou budget : SerpApi (1 appel = 1 crédit) est réservé aux recherches
+    // point-à-point (une destination). Les radars / analyses par continent
+    // restent sur la source gratuite en cache.
+    if (request.destinations.length !== 1) {
       this.logger?.debug(
-        { provider: this.name, asked: destinations.length, cap: this.maxDestinations },
-        "serpapi : nombre de destinations plafonné (garde-fou budget)",
+        { provider: this.name, destinations: request.destinations.length },
+        "serpapi : ignoré (réservé aux recherches point-à-point)",
       );
-      destinations = destinations.slice(0, this.maxDestinations);
+      return [];
     }
+    const destination = request.destinations[0]!;
 
     const outboundDate = request.departureWindow.start;
     const returnDate = addDays(isoDate(outboundDate), request.tripDuration.minDays);
 
-    const perDestination = await Promise.all(
-      destinations.map((destination) =>
-        this.searchOne(request, destination, outboundDate, returnDate),
+    // 1 appel par cabine → on renvoie tout, l'analyse gardera les 3 moins chers.
+    const perCabin = await Promise.all(
+      CABINS_QUERIED.map((cabin) =>
+        this.searchOne(request, destination, outboundDate, returnDate, cabin),
       ),
     );
-    return perDestination.flat();
+    return perCabin.flat();
   }
 
   private async searchOne(
@@ -121,6 +116,7 @@ export class SerpApiFlightProvider implements FlightProvider {
     destination: string,
     outboundDate: string,
     returnDate: string,
+    cabin: CabinClass,
   ): Promise<FlightOffer[]> {
     const params = new URLSearchParams({
       engine: "google_flights",
@@ -130,7 +126,7 @@ export class SerpApiFlightProvider implements FlightProvider {
       outbound_date: outboundDate,
       return_date: returnDate,
       type: "1",
-      travel_class: TRAVEL_CLASS[request.cabinClass],
+      travel_class: TRAVEL_CLASS[cabin],
       stops: stopsParam(request.maxStops),
       currency: request.currency,
       adults: String(request.passengers.adults),
@@ -196,7 +192,15 @@ export class SerpApiFlightProvider implements FlightProvider {
     const priceInsights = parsed.data.price_insights ?? null;
     return options
       .map((opt) =>
-        this.toFlightOffer(request, destination, outboundDate, returnDate, opt, priceInsights),
+        this.toFlightOffer(
+          request,
+          destination,
+          outboundDate,
+          returnDate,
+          cabin,
+          opt,
+          priceInsights,
+        ),
       )
       .filter((o): o is FlightOffer => o !== null);
   }
@@ -206,6 +210,7 @@ export class SerpApiFlightProvider implements FlightProvider {
     destination: string,
     outboundDate: string,
     returnDate: string,
+    cabin: CabinClass,
     option: SerpFlightOption,
     priceInsights: unknown,
   ): FlightOffer | null {
@@ -249,7 +254,7 @@ export class SerpApiFlightProvider implements FlightProvider {
     const fingerprint = computeFingerprint({
       origin: request.origin,
       destination,
-      cabinClass: request.cabinClass,
+      cabinClass: cabin,
       outbound,
       inbound,
     });
@@ -258,7 +263,7 @@ export class SerpApiFlightProvider implements FlightProvider {
       provider: this.name,
       origin: request.origin,
       destination,
-      cabinClass: request.cabinClass,
+      cabinClass: cabin,
       outbound,
       inbound,
       price: { amount: Math.round(option.price * 100), currency: request.currency },

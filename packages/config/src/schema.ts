@@ -107,6 +107,8 @@ export const configSchema = z
     RADAR_BATCH_SIZE: posInt.max(60).default(8),
     /** Runner one-shot : plafond de recherches dues traitées en un passage. */
     ONCE_MAX_SEARCHES: posInt.max(500).default(100),
+    /** Combos de dates par passage quand SerpApi est actif (garde-fou budget). */
+    SERPAPI_COMBINATIONS_PER_RUN: posInt.max(6).default(1),
     /** Purge des `price_snapshots` plus vieux que N jours (runner one-shot). */
     SNAPSHOT_RETENTION_DAYS: posInt.default(180),
     // Scénario du MockFlightProvider tant qu'aucun provider réel n'est branché (Phase 7).
@@ -199,6 +201,7 @@ export const configSchema = z
       schedulerIntervalMs: raw.SCHEDULER_INTERVAL_MS,
       searchWorkerConcurrency: raw.SEARCH_WORKER_CONCURRENCY,
       combinationsPerRun: raw.SEARCH_COMBINATIONS_PER_RUN,
+      serpapiCombosPerRun: raw.SERPAPI_COMBINATIONS_PER_RUN,
       providerMinIntervalSeconds: raw.PROVIDER_MIN_INTERVAL_SECONDS,
       radarBatchSize: raw.RADAR_BATCH_SIZE,
       onceMaxSearches: raw.ONCE_MAX_SEARCHES,
