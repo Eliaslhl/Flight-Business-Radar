@@ -97,6 +97,8 @@ export const searches = pgTable(
 
     status: searchStatusEnum("status").notNull().default("ACTIVE"),
     priority: searchPriorityEnum("priority").notNull().default("MEDIUM"),
+    /** `true` ⇒ priorité fixée par l'utilisateur, le worker ne la recalcule plus. */
+    priorityLocked: boolean("priority_locked").notNull().default(false),
 
     // Surveillance adaptative (Phase 0 §8) — valeurs pilotées par le scheduler.
     intervalSeconds: integer("interval_seconds").notNull().default(1800),

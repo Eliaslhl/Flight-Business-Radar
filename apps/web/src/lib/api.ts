@@ -16,6 +16,7 @@ import type {
   PriceSnapshot,
   Search,
   SearchFlight,
+  SearchPriority,
 } from "./types";
 
 /** Base vide ⇒ même origine : les rewrites Next proxy `/api/*` et `/health` vers l'API Fastify. */
@@ -82,7 +83,14 @@ export const api = {
   deleteSearch: (id: string) => request<void>(`/api/searches/${id}`, { method: "DELETE" }),
   activateSearch: (id: string) => post(`/api/searches/${id}/activate`) as Promise<Search>,
   pauseSearch: (id: string) => post(`/api/searches/${id}/pause`) as Promise<Search>,
-  runSearch: (id: string) => post(`/api/searches/${id}/run`) as Promise<{ jobId: string }>,
+  runSearch: (id: string) =>
+    post(`/api/searches/${id}/run`) as Promise<{
+      enqueued: boolean;
+      jobId?: string;
+      scheduled?: boolean;
+    }>,
+  setPriority: (id: string, priority: SearchPriority) =>
+    post(`/api/searches/${id}/priority`, { priority }) as Promise<Search>,
 
   flights: (id: string) =>
     request<{ flights: SearchFlight[] }>(`/api/searches/${id}/flights`).then((r) => r.flights),

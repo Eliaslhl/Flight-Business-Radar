@@ -10,6 +10,7 @@ import {
   listSearchFlights,
   listSnapshotsForSearch,
   replaceCombinations,
+  setSearchPriority,
   setSearchStatus,
   updateSearchSchedule,
   type Database,
@@ -70,6 +71,7 @@ const toDto = (row: SearchRow) => ({
   excludedAirlines: row.excludedAirlines,
   status: row.status,
   priority: row.priority,
+  priorityLocked: row.priorityLocked,
   intervalSeconds: row.intervalSeconds,
   nextRunAt: row.nextRunAt.toISOString(),
   lastRunAt: row.lastRunAt?.toISOString() ?? null,
@@ -187,9 +189,26 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
   app.post("/api/searches/:id/run", async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!(await loadOwned(id, request, reply))) return reply;
-    if (!deps.queue) return reply.code(503).send({ error: "QUEUE_UNAVAILABLE" });
-    const job = await enqueueSearchRun(deps.queue, { searchId: id, reason: "manual" });
-    return reply.code(202).send({ enqueued: true, jobId: job.id });
+    if (deps.queue) {
+      const job = await enqueueSearchRun(deps.queue, { searchId: id, reason: "manual" });
+      return reply.code(202).send({ enqueued: true, jobId: job.id });
+    }
+    // Pas de worker (déploiement gratuit) : on avance juste l'échéance, le
+    // prochain passage du cron traitera la recherche.
+    await updateSearchSchedule(db, id, { nextRunAt: new Date() });
+    return reply.code(202).send({ enqueued: false, scheduled: true });
+  });
+
+  app.post("/api/searches/:id/priority", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!(await loadOwned(id, request, reply))) return reply;
+    const body = request.body as { priority?: unknown };
+    if (body.priority !== "HIGH" && body.priority !== "MEDIUM" && body.priority !== "LOW") {
+      return reply.code(400).send({ error: "VALIDATION_FAILED", message: "priority invalide" });
+    }
+    const row = await setSearchPriority(db, id, body.priority);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    return toDto(row);
   });
 
   app.get("/api/searches/:id/flights", async (request, reply) => {

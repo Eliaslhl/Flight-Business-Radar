@@ -330,19 +330,22 @@ export const processSearchRun = async (
     },
     { providerMinIntervalSeconds: deps.providerMinIntervalSeconds },
   );
-  const priority = computeSearchPriority({
-    daysUntilWindowStart: daysUntilDeparture,
-    hasOffers,
-    ...(bestPriceCents !== null ? { bestPriceCents } : {}),
-    ...(search.targetPriceCents !== null ? { targetPriceCents: search.targetPriceCents } : {}),
-    ...(search.maxPriceCents !== null ? { maxPriceCents: search.maxPriceCents } : {}),
-  });
+  // Priorité fixée à la main ⇒ on n'y touche plus (sinon recalcul adaptatif).
+  const priority = search.priorityLocked
+    ? undefined
+    : computeSearchPriority({
+        daysUntilWindowStart: daysUntilDeparture,
+        hasOffers,
+        ...(bestPriceCents !== null ? { bestPriceCents } : {}),
+        ...(search.targetPriceCents !== null ? { targetPriceCents: search.targetPriceCents } : {}),
+        ...(search.maxPriceCents !== null ? { maxPriceCents: search.maxPriceCents } : {}),
+      });
 
   await updateSearchSchedule(deps.db, search.id, {
     nextRunAt: new Date(runAt.getTime() + intervalSeconds * 1000),
     lastRunAt: runAt,
     intervalSeconds,
-    priority,
+    ...(priority ? { priority } : {}),
   });
 
   deps.logger.info(

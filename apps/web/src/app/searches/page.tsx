@@ -3,15 +3,31 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { PriorityBadge, StatusBadge } from "@/components/badges";
+import { StatusBadge } from "@/components/badges";
 import { CreateSearchForm } from "@/components/create-search-form";
-import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "@/components/ui";
+import { useToast } from "@/components/toast";
+import { Button, Card, EmptyState, ErrorState, PageHeader, Select, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatEur, relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
+import type { SearchPriority } from "@/lib/types";
+
+const PRIORITY_RANK: Record<SearchPriority, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+const PRIORITY_LABEL: Record<SearchPriority, string> = {
+  HIGH: "Élevée",
+  MEDIUM: "Moyenne",
+  LOW: "Basse",
+};
+
+const ACTION_TOAST: Record<string, string> = {
+  activate: "Recherche activée ✓",
+  pause: "Recherche en pause",
+  delete: "Recherche supprimée ✓",
+};
 
 export default function SearchesPage() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [showForm, setShowForm] = useState(false);
   const searches = useQuery({ queryKey: qk.searches, queryFn: api.listSearches });
 
@@ -23,16 +39,33 @@ export default function SearchesPage() {
     }: {
       id: string;
       action: "activate" | "pause" | "run" | "delete";
-    }): Promise<void> => {
+    }): Promise<string> => {
       if (action === "activate") await api.activateSearch(id);
       else if (action === "pause") await api.pauseSearch(id);
-      else if (action === "run") await api.runSearch(id);
-      else await api.deleteSearch(id);
+      else if (action === "run") {
+        const r = await api.runSearch(id);
+        return r.scheduled ? "Analyse programmée (prochain passage ≤ 15 min)" : "Analyse lancée ✓";
+      } else await api.deleteSearch(id);
+      return ACTION_TOAST[action] ?? "Fait ✓";
     },
-    onSuccess: invalidate,
+    onSuccess: (msg) => {
+      invalidate();
+      toast(msg, "ok");
+    },
+    onError: () => toast("Action impossible — réessaie", "error"),
+  });
+  const setPriority = useMutation({
+    mutationFn: ({ id, priority }: { id: string; priority: SearchPriority }) =>
+      api.setPriority(id, priority),
+    onSuccess: () => {
+      invalidate();
+      toast("Priorité mise à jour ✓", "ok");
+    },
   });
 
-  const rows = searches.data ?? [];
+  const rows = [...(searches.data ?? [])].sort(
+    (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority],
+  );
 
   return (
     <div className="space-y-6">
@@ -74,8 +107,24 @@ export default function SearchesPage() {
                     <Link href={`/searches/${s.id}`} className="font-medium hover:underline">
                       {s.label ?? `${s.origin} → ${s.destinations.join(", ") || "Radar"}`}
                     </Link>
-                    <div className="mt-1">
-                      <PriorityBadge priority={s.priority} />
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-xs text-[var(--color-muted)]">Priorité</span>
+                      <Select
+                        className="h-7 w-24 py-0 text-xs"
+                        value={s.priority}
+                        onChange={(e) =>
+                          setPriority.mutate({
+                            id: s.id,
+                            priority: e.target.value as SearchPriority,
+                          })
+                        }
+                      >
+                        {(["HIGH", "MEDIUM", "LOW"] as const).map((p) => (
+                          <option key={p} value={p}>
+                            {PRIORITY_LABEL[p]}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">

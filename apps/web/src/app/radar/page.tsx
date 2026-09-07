@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AirportInput } from "@/components/airport-input";
-import { CABIN_LABEL } from "@/components/create-search-form";
+import { useToast } from "@/components/toast";
 import {
   Badge,
   Button,
@@ -23,13 +23,7 @@ import { api } from "@/lib/api";
 import { flagEmoji } from "@/lib/flags";
 import { formatDate, formatEur } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import type {
-  CabinClass,
-  CreateSearchInput,
-  RadarDestinationRank,
-  Search,
-  SeedAirport,
-} from "@/lib/types";
+import type { CreateSearchInput, RadarDestinationRank, Search, SeedAirport } from "@/lib/types";
 
 const REGION_LABEL: Record<string, string> = {
   ASIA: "Asie",
@@ -41,14 +35,13 @@ const REGION_LABEL: Record<string, string> = {
   INDIAN_OCEAN: "Océan Indien",
 };
 
-const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
-
 /** Une recherche « radar » : sans destination, ou libellée « Radar … ». */
 const isRadarSearch = (s: Search): boolean =>
   s.destinations.length === 0 || (s.label ?? "").startsWith("Radar ");
 
 export default function RadarPage() {
   const qc = useQueryClient();
+  const toast = useToast();
   const searches = useQuery({ queryKey: qk.searches, queryFn: api.listSearches });
   const seed = useQuery({ queryKey: qk.radarDestinations, queryFn: api.radarDestinations });
 
@@ -65,10 +58,15 @@ export default function RadarPage() {
 
   const run = useMutation({
     mutationFn: () => api.runSearch(radarSearch!.id),
-    onSuccess: () => {
+    onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: qk.recommendations(radarSearch!.id) });
       void qc.invalidateQueries({ queryKey: qk.searches });
+      toast(
+        r.scheduled ? "Analyse programmée (prochain passage ≤ 15 min)" : "Analyse lancée ✓",
+        "ok",
+      );
     },
+    onError: () => toast("Analyse impossible — réessaie", "error"),
   });
 
   const byRegion = useMemo(() => {
@@ -261,6 +259,7 @@ function RankingTable({
 }
 
 function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
+  const toast = useToast();
   const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
   const airportList = airports.data ?? [];
   const seed = useQuery({ queryKey: qk.radarDestinations, queryFn: api.radarDestinations });
@@ -272,7 +271,6 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
   const [form, setForm] = useState({
     origin: "CDG",
     continent: "ALL",
-    cabinClass: "ECONOMY" as CabinClass,
     start: "",
     end: "",
     minDays: "7",
@@ -293,14 +291,18 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
         }`,
         origin: form.origin.trim().toUpperCase(),
         destinations: dests,
-        cabinClass: form.cabinClass,
+        cabinClass: "ECONOMY",
         departureWindow: { start: form.start, end: form.end },
         tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
       };
       const created = await api.createSearch(body);
       await api.activateSearch(created.id);
     },
-    onSuccess: onCreated,
+    onSuccess: () => {
+      toast("Radar activé ✓", "ok");
+      onCreated();
+    },
+    onError: () => toast("Activation impossible — vérifie les champs", "error"),
   });
 
   return (
@@ -332,15 +334,6 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
             {regions.map((r) => (
               <option key={r} value={r}>
                 {REGION_LABEL[r] ?? r}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Classe">
-          <Select value={form.cabinClass} onChange={set("cabinClass")}>
-            {CABINS.map((c) => (
-              <option key={c} value={c}>
-                {CABIN_LABEL[c]}
               </option>
             ))}
           </Select>

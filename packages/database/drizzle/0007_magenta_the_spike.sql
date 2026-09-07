@@ -1,0 +1,1 @@
+ALTER TABLE "searches" ADD COLUMN "priority_locked" boolean DEFAULT false NOT NULL;
