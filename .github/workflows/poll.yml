@@ -47,7 +47,9 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # --prod=false : le job tourne en NODE_ENV=production, qui sinon ferait
+        # sauter les devDependencies (@types/node…) nécessaires au build tsc.
+        run: pnpm install --frozen-lockfile --prod=false
 
       - name: Build worker
         run: pnpm --filter @fbr/worker... build
