@@ -99,6 +99,32 @@ describe("loadConfig", () => {
     expect(cfg.notifications.telegram).toBeNull();
   });
 
+  it('accepte les champs texte / URL optionnels vides (secrets absents en CI/CD ⇒ "")', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      TRAVELPAYOUTS_TOKEN: "",
+      TRAVELPAYOUTS_MARKER: "",
+      TELEGRAM_BOT_TOKEN: "",
+      TELEGRAM_CHAT_ID: "",
+      SMTP_URL: "",
+      EMAIL_FROM: "  ",
+      EMAIL_TO: "",
+      NOTIFICATION_WEBHOOK_URL: "",
+      FAST_FLIGHTS_URL: "",
+      ANTHROPIC_API_KEY: "",
+    });
+    expect(cfg.providers.travelpayouts).toBeNull();
+    expect(cfg.providers.fastFlights).toBeNull();
+    expect(cfg.notifications).toEqual({
+      telegram: null,
+      email: null,
+      webhook: null,
+      timeoutMs: 10_000,
+      maxAttempts: 3,
+    });
+    expect(cfg.advisor.anthropic).toBeNull();
+  });
+
   it("structure les canaux de notification quand leur config est complète", () => {
     const base = loadConfig({ ...baseEnv });
     expect(base.notifications).toEqual({
