@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventBadge, StatusBadge } from "@/components/badges";
 import { AlertsPanel } from "@/components/alerts-panel";
 import { CABIN_LABEL } from "@/components/create-search-form";
+import { EditSearchForm } from "@/components/edit-search-form";
 import { MonthlyChart } from "@/components/monthly-chart";
 import { PriceChart } from "@/components/price-chart";
 import { useToast } from "@/components/toast";
@@ -63,6 +65,7 @@ export default function SearchDetailPage() {
   const id = String(useParams().id);
   const qc = useQueryClient();
   const toast = useToast();
+  const [editing, setEditing] = useState(false);
 
   const search = useQuery({ queryKey: qk.search(id), queryFn: () => api.getSearch(id) });
   const flights = useQuery({ queryKey: qk.flights(id), queryFn: () => api.flights(id) });
@@ -154,7 +157,8 @@ export default function SearchDetailPage() {
               <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
                 Priorité
                 <Select
-                  className="h-7 w-24 py-0 text-xs"
+                  size="sm"
+                  className="w-24"
                   value={s.priority}
                   onChange={(e) => setPriority.mutate(e.target.value as SearchPriority)}
                 >
@@ -174,10 +178,20 @@ export default function SearchDetailPage() {
               </span>
             </div>
           </div>
-          <Button variant="primary" onClick={() => run.mutate()} disabled={run.isPending}>
-            {run.isPending ? "…" : "Analyser maintenant"}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="ghost" onClick={() => setEditing((v) => !v)}>
+              {editing ? "Fermer" : "Modifier"}
+            </Button>
+            <Button variant="primary" onClick={() => run.mutate()} disabled={run.isPending}>
+              {run.isPending ? "…" : "Analyser maintenant"}
+            </Button>
+          </div>
         </div>
+        {editing ? (
+          <div className="mt-4">
+            <EditSearchForm search={s} onDone={() => setEditing(false)} />
+          </div>
+        ) : null}
       </div>
 
       {/* Analytics résumé */}

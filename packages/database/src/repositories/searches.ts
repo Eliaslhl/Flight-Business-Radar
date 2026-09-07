@@ -65,6 +65,44 @@ export const getSearch = async (db: Database, id: string): Promise<SearchRow | u
   return row;
 };
 
+export interface UpdateSearchInput {
+  label?: string | null;
+  origin?: string;
+  destinations?: string[];
+  departureWindowStart?: string;
+  departureWindowEnd?: string;
+  minTripDays?: number;
+  maxTripDays?: number;
+  maxStops?: number;
+  maxPriceCents?: number | null;
+  targetPriceCents?: number | null;
+  nextRunAt?: Date;
+}
+
+/** Met à jour les champs fournis d'une recherche. Retourne la ligne à jour. */
+export const updateSearch = async (
+  db: Database,
+  id: string,
+  patch: UpdateSearchInput,
+): Promise<SearchRow | undefined> => {
+  const set: Partial<NewSearchRow> = {};
+  if (patch.label !== undefined) set.label = patch.label;
+  if (patch.origin !== undefined) set.origin = patch.origin;
+  if (patch.destinations !== undefined) set.destinations = patch.destinations;
+  if (patch.departureWindowStart !== undefined)
+    set.departureWindowStart = patch.departureWindowStart;
+  if (patch.departureWindowEnd !== undefined) set.departureWindowEnd = patch.departureWindowEnd;
+  if (patch.minTripDays !== undefined) set.minTripDays = patch.minTripDays;
+  if (patch.maxTripDays !== undefined) set.maxTripDays = patch.maxTripDays;
+  if (patch.maxStops !== undefined) set.maxStops = patch.maxStops;
+  if (patch.maxPriceCents !== undefined) set.maxPriceCents = patch.maxPriceCents;
+  if (patch.targetPriceCents !== undefined) set.targetPriceCents = patch.targetPriceCents;
+  if (patch.nextRunAt !== undefined) set.nextRunAt = patch.nextRunAt;
+  if (Object.keys(set).length === 0) return getSearch(db, id);
+  const [row] = await db.update(searches).set(set).where(eq(searches.id, id)).returning();
+  return row;
+};
+
 /** Fixe la priorité manuellement (verrouille le recalcul adaptatif du worker). */
 export const setSearchPriority = async (
   db: Database,

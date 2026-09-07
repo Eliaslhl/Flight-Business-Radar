@@ -48,6 +48,38 @@ export const createSearchBodySchema = z
 
 export type CreateSearchBody = z.infer<typeof createSearchBodySchema>;
 
+/**
+ * Corps de `PATCH /api/searches/:id` — tous les champs optionnels. `null`
+ * explicite efface une cible / un budget. Un changement de dates, durée,
+ * origine ou destinations regénère les combinaisons.
+ */
+export const updateSearchBodySchema = z
+  .object({
+    label: z.string().min(1).max(120).nullable(),
+    origin: airportCodeSchema,
+    destinations: z.array(airportCodeSchema),
+    departureWindow: z.object({ start: isoDateSchema, end: isoDateSchema }),
+    tripDuration: z.object({
+      minDays: z.number().int().positive(),
+      maxDays: z.number().int().positive(),
+    }),
+    maxStops: z.number().int().nonnegative().max(4),
+    maxPriceCents: z.number().int().positive().nullable(),
+    targetPriceCents: z.number().int().positive().nullable(),
+  })
+  .partial()
+  .refine(
+    (b) =>
+      !b.departureWindow || compareIsoDate(b.departureWindow.start, b.departureWindow.end) <= 0,
+    { message: "departureWindow.start doit précéder ou égaler end", path: ["departureWindow"] },
+  )
+  .refine((b) => !b.tripDuration || b.tripDuration.minDays <= b.tripDuration.maxDays, {
+    message: "tripDuration.minDays doit être <= maxDays",
+    path: ["tripDuration"],
+  });
+
+export type UpdateSearchBody = z.infer<typeof updateSearchBodySchema>;
+
 /** Corps de `POST /api/alerts`. */
 export const createAlertBodySchema = z.object({
   searchId: z.string().uuid(),

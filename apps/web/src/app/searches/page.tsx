@@ -107,10 +107,11 @@ export default function SearchesPage() {
                     <Link href={`/searches/${s.id}`} className="font-medium hover:underline">
                       {s.label ?? `${s.origin} → ${s.destinations.join(", ") || "Radar"}`}
                     </Link>
-                    <div className="mt-1 flex items-center gap-1.5">
+                    <div className="mt-1.5 flex items-center gap-1.5">
                       <span className="text-xs text-[var(--color-muted)]">Priorité</span>
                       <Select
-                        className="h-7 w-24 py-0 text-xs"
+                        size="sm"
+                        className="w-24"
                         value={s.priority}
                         onChange={(e) =>
                           setPriority.mutate({

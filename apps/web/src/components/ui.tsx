@@ -183,8 +183,21 @@ export function Input({ className, type, ...props }: InputHTMLAttributes<HTMLInp
   );
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cx(CONTROL, "cursor-pointer appearance-none", className)} {...props} />;
+export function Select({
+  className,
+  size = "md",
+  ...props
+}: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & { size?: "sm" | "md" }) {
+  return (
+    <select
+      className={cx(
+        "cursor-pointer rounded-[var(--radius)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-fg)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]",
+        size === "sm" ? "px-2 py-1 text-xs" : "w-full px-3 py-2 text-sm",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {

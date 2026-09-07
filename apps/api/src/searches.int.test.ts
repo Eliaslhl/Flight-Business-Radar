@@ -101,6 +101,49 @@ suite("API /api/searches (intégration Postgres)", () => {
     );
   });
 
+  it("PATCH /:id modifie cible + budget et regénère les combos si les dates changent", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+
+    const patched = await app.inject({
+      method: "PATCH",
+      url: `/api/searches/${id}`,
+      payload: { targetPriceCents: 90_000, maxPriceCents: null, label: "renommée" },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(
+      patched.json<{ targetPriceCents: number; maxPriceCents: number | null; label: string }>(),
+    ).toMatchObject({
+      targetPriceCents: 90_000,
+      maxPriceCents: null,
+      label: "renommée",
+    });
+
+    const before = (await app.inject({ method: "GET", url: `/api/searches/${id}` })).json<{
+      dateCombinations?: number;
+    }>();
+    const withDates = await app.inject({
+      method: "PATCH",
+      url: `/api/searches/${id}`,
+      payload: {
+        departureWindow: { start: "2027-03-01", end: "2027-03-01" },
+        tripDuration: { minDays: 12, maxDays: 12 },
+      },
+    });
+    expect(withDates.statusCode).toBe(200);
+    expect(withDates.json<{ departureWindow: { start: string } }>().departureWindow.start).toBe(
+      "2027-03-01",
+    );
+    void before;
+
+    const bad = await app.inject({
+      method: "PATCH",
+      url: `/api/searches/${id}`,
+      payload: { maxStops: 99 },
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+
   it("POST /priority fixe la priorité et la verrouille", async () => {
     const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
     const { id } = created.json<{ id: string }>();

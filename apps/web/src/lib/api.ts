@@ -17,6 +17,7 @@ import type {
   Search,
   SearchFlight,
   SearchPriority,
+  UpdateSearchInput,
 } from "./types";
 
 /** Base vide ⇒ même origine : les rewrites Next proxy `/api/*` et `/health` vers l'API Fastify. */
@@ -80,6 +81,8 @@ export const api = {
   getSearch: (id: string) => request<Search>(`/api/searches/${id}`),
   createSearch: (body: CreateSearchInput) =>
     request<Search>("/api/searches", { method: "POST", body: JSON.stringify(body) }),
+  updateSearch: (id: string, body: UpdateSearchInput) =>
+    request<Search>(`/api/searches/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteSearch: (id: string) => request<void>(`/api/searches/${id}`, { method: "DELETE" }),
   activateSearch: (id: string) => post(`/api/searches/${id}/activate`) as Promise<Search>,
   pauseSearch: (id: string) => post(`/api/searches/${id}/pause`) as Promise<Search>,
