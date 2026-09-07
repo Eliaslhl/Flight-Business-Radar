@@ -7,7 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/query-keys";
 import type { CabinClass, CreateSearchInput } from "@/lib/types";
 
-const CABINS: CabinClass[] = ["BUSINESS", "FIRST", "PREMIUM_ECONOMY", "ECONOMY"];
+const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
 
 export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   const qc = useQueryClient();
@@ -15,7 +15,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     label: "",
     origin: "CDG",
     destinations: "HND",
-    cabinClass: "BUSINESS" as CabinClass,
+    cabinClass: "ECONOMY" as CabinClass,
     start: "",
     end: "",
     minDays: "10",

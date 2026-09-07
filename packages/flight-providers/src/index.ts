@@ -9,4 +9,6 @@ export * from "./serpapi-contract.js";
 export * from "./serpapi-provider.js";
 export * from "./duffel-contract.js";
 export * from "./duffel-provider.js";
+export * from "./travelpayouts-contract.js";
+export * from "./travelpayouts-provider.js";
 export * from "./fixture-provider.js";

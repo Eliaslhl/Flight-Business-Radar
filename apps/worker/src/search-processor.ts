@@ -8,6 +8,7 @@ import {
   upsertOffer,
   upsertProviderLink,
   insertSnapshots,
+  dedupeAgainstExistingSnapshots,
   insertProviderRequests,
   type ProviderRequestInput,
   type Database,
@@ -258,7 +259,9 @@ export const processSearchRun = async (
     for (const { id, offer } of persisted.offers) offersById.set(id, offer);
   }
 
-  const snapshotsInserted = await insertSnapshots(deps.db, allSnapshots);
+  // Écarte les re-lectures identiques d'une source à données en cache (Travelpayouts).
+  const freshSnapshots = await dedupeAgainstExistingSnapshots(deps.db, allSnapshots);
+  const snapshotsInserted = await insertSnapshots(deps.db, freshSnapshots);
   await insertProviderRequests(deps.db, providerRequestRows);
   await markCombinationsChecked(
     deps.db,
@@ -267,7 +270,7 @@ export const processSearchRun = async (
   );
 
   // Passe `analyze` : dérivation + résolution des événements de prix (Phase 4).
-  const offerIds = [...new Set(allSnapshots.map((s) => s.flightOfferId))];
+  const offerIds = [...new Set(freshSnapshots.map((s) => s.flightOfferId))];
   const { eventsDetected, eventsResolved, detected } = await analyzeOffers(
     { db: deps.db, logger: deps.logger, thresholds: deps.thresholds },
     { search, offerIds, now: runAt },
@@ -288,7 +291,7 @@ export const processSearchRun = async (
     isoDate(runAt.toISOString().slice(0, 10)),
     isoDate(search.departureWindowStart),
   );
-  const hasOffers = allSnapshots.length > 0;
+  const hasOffers = freshSnapshots.length > 0;
   const { tier, intervalSeconds } = computeNextIntervalSeconds(
     {
       hasOffers,

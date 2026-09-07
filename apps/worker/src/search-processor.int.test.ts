@@ -12,7 +12,8 @@ import {
   type DbHandle,
 } from "@fbr/database";
 import { DEFAULT_DROP_THRESHOLDS } from "@fbr/analytics";
-import { MockFlightProvider, ProviderRegistry } from "@fbr/flight-providers";
+import { flightOfferSchema } from "@fbr/flight-domain";
+import { FixtureFlightProvider, MockFlightProvider, ProviderRegistry } from "@fbr/flight-providers";
 import { NotificationService } from "@fbr/notifications";
 import { createSilentLogger } from "@fbr/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -120,6 +121,55 @@ suite("processSearchRun (intégration Postgres)", () => {
     expect(fresh?.lastRunAt).not.toBeNull();
     expect(fresh?.nextRunAt.getTime()).toBeGreaterThan(Date.now());
     expect(["HIGH", "MEDIUM", "LOW"]).toContain(fresh?.priority);
+  });
+
+  it("source en cache : une offre au même found_at n'est snapshotée qu'une fois", async () => {
+    const search = await makeSingleComboSearch();
+    const cachedOffer = flightOfferSchema.parse({
+      provider: "travelpayouts",
+      origin: "CDG",
+      destination: "HND",
+      cabinClass: "BUSINESS",
+      outbound: {
+        departureDate: "2026-11-10",
+        departureAt: "2026-11-10T12:00:00Z",
+        arrivalAt: "2026-11-10T20:00:00Z",
+        durationMinutes: 600,
+        stops: 0,
+        marketingAirline: "AF",
+        flightNumbers: [],
+      },
+      inbound: {
+        departureDate: "2026-11-20",
+        departureAt: "2026-11-20T12:00:00Z",
+        arrivalAt: "2026-11-20T20:00:00Z",
+        durationMinutes: 600,
+        stops: 0,
+        marketingAirline: "AF",
+        flightNumbers: [],
+      },
+      price: { amount: 90_000, currency: "EUR" },
+      availability: "UNKNOWN",
+      observedAt: "2026-09-01T10:00:00.000Z", // found_at figé (cache)
+      fingerprint: "fbr_cached_offer",
+    });
+    const registry = new ProviderRegistry([
+      new FixtureFlightProvider({ offers: [cachedOffer], name: "travelpayouts" }),
+    ]);
+
+    const first = await processSearchRun(deps(registry, 1), {
+      searchId: search.id,
+      reason: "manual",
+    });
+    expect(first.snapshotsInserted).toBe(1);
+
+    const second = await processSearchRun(deps(registry, 1), {
+      searchId: search.id,
+      reason: "manual",
+    });
+    expect(second.snapshotsInserted).toBe(0); // déjà en base au même observed_at
+
+    expect(await countSnapshotsForSearch(handle.db, search.id)).toBe(1);
   });
 
   it("mode Radar : éclate un couple de dates sur une tranche de destinations seed", async () => {
