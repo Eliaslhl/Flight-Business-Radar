@@ -46,6 +46,9 @@ export interface SearchProcessorDeps {
   readonly registry: ProviderRegistry;
   readonly logger: Logger;
   readonly combinationsPerRun: number;
+  /** SerpApi actif ⇒ recherches point-à-point limitées à `serpapiCombosPerRun` combos. */
+  readonly serpapiActive?: boolean;
+  readonly serpapiCombosPerRun?: number;
   readonly providerMinIntervalSeconds: number;
   /**
    * Mode Radar : nombre de destinations de la liste seed sondées par run
@@ -204,14 +207,20 @@ export const processSearchRun = async (
     "recherche démarrée",
   );
 
+  const searchLike = toSearchLike(search);
+  const radar = searchLike.destinations.length === 0;
+  const pointToPoint = search.destinations.length === 1;
+  // Garde-fou budget SerpApi : une recherche point-à-point n'interroge qu'un
+  // seul couple de dates par passage (× 3 cabines côté provider).
+  const comboBudget =
+    deps.serpapiActive && pointToPoint ? (deps.serpapiCombosPerRun ?? 1) : deps.combinationsPerRun;
+
   await ensureCombinations(deps, search);
-  const picked = await pickCombinations(deps.db, search.id, deps.combinationsPerRun);
+  const picked = await pickCombinations(deps.db, search.id, comboBudget);
   if (picked.length === 0) {
     return skippedSummary(search.id, "no_combinations");
   }
 
-  const searchLike = toSearchLike(search);
-  const radar = searchLike.destinations.length === 0;
   // Mode Radar : un seul couple de dates représentatif, mais éclaté sur une
   // tranche rotative de la liste seed (change toutes les 10 min → couverture
   // complète en quelques runs).
@@ -262,6 +271,9 @@ export const processSearchRun = async (
 
     const normalized = normalizeSearchResults(validationRequest, offers, {
       baseCurrency: search.currency,
+      // Plus de filtre par cabine : on garde toutes les cabines (Éco / Éco+ /
+      // Affaires) et l'UI affiche les 3 moins chères, cabine mélangée.
+      requireCabinMatch: false,
     });
     offersKept += normalized.offers.length;
 

@@ -1,5 +1,4 @@
 import { flightSearchRequestSchema, type FlightSearchRequest } from "@fbr/flight-domain";
-import { ProviderError } from "@fbr/shared";
 import { describe, expect, it, vi } from "vitest";
 import { SerpApiFlightProvider } from "./serpapi-provider.js";
 
@@ -118,9 +117,33 @@ const ok = (json: unknown) => ({
   text: () => Promise.resolve(JSON.stringify(json)),
 });
 
+const travelClassOf = (call: unknown): string =>
+  new URL((call as [string])[0]).searchParams.get("travel_class") ?? "";
+
+/** Ne renvoie la fixture (prix business) que pour l'appel `travel_class=3`. */
+const cabinAwareFetch = () =>
+  vi
+    .fn()
+    .mockImplementation((url: string) =>
+      Promise.resolve(
+        ok(
+          new URL(url).searchParams.get("travel_class") === "3"
+            ? SERPAPI_FIXTURE
+            : { best_flights: [], other_flights: [] },
+        ),
+      ),
+    );
+
 describe("SerpApiFlightProvider", () => {
+  it("interroge 3 cabines par passage (Éco / Éco+ / Affaires)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ best_flights: [], other_flights: [] }));
+    await new SerpApiFlightProvider({ apiKey: "k", fetchImpl }).searchFlights(request());
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls.map(travelClassOf).sort()).toEqual(["1", "2", "3"]);
+  });
+
   it("convertit la réponse SerpApi en FlightOffer[] (contract test)", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(ok(SERPAPI_FIXTURE));
+    const fetchImpl = cabinAwareFetch();
     const provider = new SerpApiFlightProvider({ apiKey: "sk-serp", fetchImpl, now: () => NOW });
 
     const offers = await provider.searchFlights(request());
@@ -130,7 +153,7 @@ describe("SerpApiFlightProvider", () => {
     expect(af.provider).toBe("serpapi");
     expect(af.origin).toBe("CDG");
     expect(af.destination).toBe("HND");
-    expect(af.cabinClass).toBe("BUSINESS");
+    expect(af.cabinClass).toBe("BUSINESS"); // vient de l'appel travel_class=3
     expect(af.outbound.marketingAirline).toBe("AF");
     expect(af.outbound.flightNumbers).toEqual(["AF276"]); // « AF 276 » normalisé
     expect(af.outbound.departureDate).toBe("2026-11-10");
@@ -148,8 +171,8 @@ describe("SerpApiFlightProvider", () => {
     expect(lh.price.amount).toBe(269_100);
   });
 
-  it("envoie les bons paramètres de requête (business, round trip, stops, devise)", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(ok(SERPAPI_FIXTURE));
+  it("envoie les bons paramètres de requête (round trip, stops, devise, cabines)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ best_flights: [], other_flights: [] }));
     await new SerpApiFlightProvider({ apiKey: "sk-serp", fetchImpl }).searchFlights(
       request({ currency: "EUR", maxStops: 1 }),
     );
@@ -163,9 +186,10 @@ describe("SerpApiFlightProvider", () => {
     expect(q.get("outbound_date")).toBe("2026-11-10");
     expect(q.get("return_date")).toBe("2026-11-22");
     expect(q.get("type")).toBe("1");
-    expect(q.get("travel_class")).toBe("3");
     expect(q.get("stops")).toBe("2"); // maxStops 1 → « ≤ 1 escale »
     expect(q.get("currency")).toBe("EUR");
+    // les 3 cabines sont bien couvertes
+    expect(fetchImpl.mock.calls.map(travelClassOf).sort()).toEqual(["1", "2", "3"]);
   });
 
   it("SerpApi `error` = aucun résultat ⇒ [] sans erreur", async () => {
@@ -220,18 +244,23 @@ describe("SerpApiFlightProvider", () => {
     ).rejects.toMatchObject({ code: "PROVIDER_TIMEOUT", retryable: true });
   });
 
-  it("mode Radar (sans destination) ⇒ ProviderError", async () => {
+  it("sans destination (Radar) ⇒ [] sans appel réseau (réservé au point-à-point)", async () => {
+    const fetchImpl = vi.fn();
     await expect(
-      new SerpApiFlightProvider({ apiKey: "k", fetchImpl: vi.fn() }).searchFlights(
+      new SerpApiFlightProvider({ apiKey: "k", fetchImpl }).searchFlights(
         request({ destinations: [] }),
       ),
-    ).rejects.toBeInstanceOf(ProviderError);
+    ).resolves.toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("plafonne le nombre de destinations interrogées (garde-fou budget)", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(ok({ best_flights: [], other_flights: [] }));
-    const provider = new SerpApiFlightProvider({ apiKey: "k", fetchImpl, maxDestinations: 2 });
-    await provider.searchFlights(request({ destinations: ["HND", "ICN", "JFK", "DXB"] }));
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  it("requête multi-destinations ⇒ [] sans appel réseau (garde-fou budget)", async () => {
+    const fetchImpl = vi.fn();
+    await expect(
+      new SerpApiFlightProvider({ apiKey: "k", fetchImpl }).searchFlights(
+        request({ destinations: ["HND", "ICN", "JFK"] }),
+      ),
+    ).resolves.toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
