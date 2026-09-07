@@ -3,6 +3,13 @@
 Next.js 15 (App Router) + TypeScript strict + Tailwind v4 + TanStack Query + Recharts.
 Découplé de l'API par **HTTP uniquement** (aucun import `@fbr/*`).
 
+**Thème** : tokens CSS dans `app/globals.css` — palette claire sur `:root`, variante
+sombre sous `@media (prefers-color-scheme: dark)` (bascule auto selon l'OS, pas de
+switch manuel). Tout le style référence ces variables via `bg-[var(--color-…)]`.
+Primitives partagées dans `components/ui.tsx` : `Button` (variantes + tailles),
+`Card` (+ `interactive`), `PageHeader`, `Stat`, `Badge`, `Input`/`Select`/`Field`,
+`Spinner`/`Skeleton`/`EmptyState`/`ErrorState`.
+
 ## Démarrer
 
 ```bash
@@ -21,14 +28,14 @@ donc nécessaire côté API.
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                                                                                                                                                                                                           |
 | `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                                                                                                                                                                                                   |
+| `/radar`         | **Exploration** : classement des destinations les moins chères (recherche Radar → `/recommendations.radar`), bouton d'analyse, formulaire compact « Activer le radar », liste seed groupée par région (`/api/radar/destinations`)                                                                     |
 | `/searches/[id]` | Résumé analytics, **carte Recommandations** (score d'opportunité + top-3 dates + classement Radar), **carte Conseil** (`/advice` — action + texte FR, badge « réponse recadrée » si le modèle a dérapé), graphique prix/temps, prix moyen par mois, événements, alertes, notifications, vols observés |
 | `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                                                                                                                                                                                                                 |
 | `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev)                                                                                                                                                                                   |
 
-Le **mode Radar** (recherche sans destination) est disponible : le formulaire de création
-accepte une liste de destinations vide, et le détail d'une recherche Radar affiche le
-**classement des destinations** dans la carte Recommandations (Phase 9). Une vue
-« exploration » dédiée (page `/radar` avec la liste seed complète) reste à faire.
+Le **mode Radar** (recherche sans destination) a sa page dédiée `/radar` : liste seed
+complète par région + classement des destinations les moins chères. Le formulaire de
+création classique accepte aussi une liste de destinations vide.
 
 ## Organisation
 
@@ -52,4 +59,4 @@ Auth.js viendra quand l'API exposera l'authentification.
 ## Tests
 
 `lib/format.test.ts` + `lib/api.test.ts` (fetch mocké) dans le projet Vitest `unit`.
-La validité du rendu est garantie par `next build` (type-check + prérendu des 8 routes).
+La validité du rendu est garantie par `next build` (type-check + prérendu des routes).

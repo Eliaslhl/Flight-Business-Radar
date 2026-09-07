@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { CreateSearchForm } from "@/components/create-search-form";
-import { Button, Card, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatEur, relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
@@ -36,12 +36,15 @@ export default function SearchesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Recherches</h1>
-        <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Fermer" : "+ Nouvelle recherche"}
-        </Button>
-      </div>
+      <PageHeader
+        title="Recherches"
+        subtitle="Chaque recherche surveille une plage de dates et historise les prix."
+        actions={
+          <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Fermer" : "+ Nouvelle recherche"}
+          </Button>
+        }
+      />
 
       {showForm ? <CreateSearchForm onCreated={() => setShowForm(false)} /> : null}
 

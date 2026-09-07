@@ -25,7 +25,7 @@ export function SearchCard({ search }: { search: Search }) {
 
   return (
     <Link href={`/searches/${search.id}`} className="block">
-      <Card className="h-full transition hover:border-[var(--color-accent)]">
+      <Card interactive className="h-full">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="font-semibold">

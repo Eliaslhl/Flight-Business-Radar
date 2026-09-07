@@ -49,7 +49,7 @@ export function MonthlyChart({ byMonth }: { byMonth: GroupStat<string>[] }) {
         />
         <Bar dataKey="mean" radius={[6, 6, 0, 0]} isAnimationActive={false}>
           {data.map((d, i) => (
-            <Cell key={i} fill={d.reliable ? "var(--color-accent)" : "#c7c9f2"} />
+            <Cell key={i} fill={d.reliable ? "var(--color-accent)" : "var(--color-accent-muted)"} />
           ))}
         </Bar>
       </BarChart>

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/searches", label: "Recherches" },
+  { href: "/radar", label: "Radar" },
   { href: "/alerts", label: "Alertes" },
   { href: "/settings", label: "Réglages" },
 ];
@@ -13,10 +14,15 @@ const LINKS = [
 export function NavBar() {
   const pathname = usePathname();
   return (
-    <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-      <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 py-4 font-semibold">
-          <span aria-hidden>✈️</span> Flight Business Radar
+    <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur">
+      <nav className="mx-auto flex max-w-6xl items-center gap-4 overflow-x-auto px-4 sm:gap-6">
+        <Link
+          href="/dashboard"
+          className="flex shrink-0 items-center gap-2 py-3.5 font-semibold tracking-tight"
+        >
+          <span aria-hidden>✈️</span>
+          <span className="hidden sm:inline">Flight Business Radar</span>
+          <span className="sm:hidden">FBR</span>
         </Link>
         <div className="flex gap-1 text-sm">
           {LINKS.map((l) => {
@@ -25,10 +31,11 @@ export function NavBar() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded-lg px-3 py-1.5 transition ${
+                aria-current={active ? "page" : undefined}
+                className={`rounded-[var(--radius)] px-3 py-1.5 whitespace-nowrap transition ${
                   active
-                    ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
-                    : "text-[var(--color-muted)] hover:bg-[var(--color-bg)]"
+                    ? "bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]"
+                    : "text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-fg)]"
                 }`}
               >
                 {l.label}
