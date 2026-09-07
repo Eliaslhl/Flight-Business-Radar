@@ -105,11 +105,18 @@ export const buildRequestForOffer = (search: SearchLike, offer: OfferLike): Flig
   });
 };
 
-/** Construit la requête « pleine fenêtre » (utile pour la génération de combinaisons / le mode Radar). */
-export const buildWindowRequest = (search: SearchLike): FlightSearchRequest =>
+/**
+ * Construit la requête « pleine fenêtre » (génération de combinaisons, mode
+ * Radar, et validation tolérante des offres d'une source qui balaie le mois
+ * plutôt qu'un couple de dates précis — cf. Travelpayouts).
+ */
+export const buildWindowRequest = (
+  search: SearchLike,
+  options: BuildRequestOptions = {},
+): FlightSearchRequest =>
   flightSearchRequestSchema.parse({
     origin: search.origin,
-    destinations: [...search.destinations],
+    destinations: [...(options.destinations ?? search.destinations)],
     cabinClass: search.cabinClass,
     departureWindow: { start: search.departureWindowStart, end: search.departureWindowEnd },
     tripDuration: { minDays: search.minTripDays, maxDays: search.maxTripDays },

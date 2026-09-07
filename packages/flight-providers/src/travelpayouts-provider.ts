@@ -66,6 +66,12 @@ export class TravelpayoutsProvider implements FlightProvider {
   private readonly fetchImpl: FetchLike;
   private readonly now: () => string;
   private readonly logger: TravelpayoutsProviderOptions["logger"];
+  /** Mémo court par `origin|destination|YYYY-MM|currency` — le worker sonde
+   *  plusieurs couples de dates du même mois en rafale, or la réponse
+   *  `period_type=month` est identique. TTL 15 min (les données changent au
+   *  mieux toutes les ~48 h). */
+  private readonly monthCache = new Map<string, { rows: TpPriceRow[]; atMs: number }>();
+  private static readonly CACHE_TTL_MS = 15 * 60_000;
 
   constructor(options: TravelpayoutsProviderOptions) {
     this.name = options.name ?? "travelpayouts";
@@ -114,16 +120,55 @@ export class TravelpayoutsProvider implements FlightProvider {
     request: FlightSearchRequest,
     destination: string,
   ): Promise<FlightOffer[]> {
-    const { start: windowStart, end: windowEnd } = request.departureWindow;
+    // Le worker cible un couple de dates précis (fenêtre réduite à un jour), mais
+    // Travelpayouts ne sert qu'un panorama mensuel en cache : on interroge le
+    // mois du départ et on renvoie tous les allers-retours éco plausibles, avec
+    // LEURS dates réelles. `recommendDates` / l'analyse trient ensuite.
+    const month = request.departureWindow.start.slice(0, 7); // YYYY-MM
+    const currency = request.currency.toUpperCase();
+    const rows = await this.fetchMonthRows(request.origin, destination, month, currency);
+
+    const today = this.now().slice(0, 10);
+    return rows
+      .filter((r) => {
+        if (r.trip_class !== undefined && r.trip_class !== 0) return false;
+        if (r.depart_date.slice(0, 7) !== month) return false;
+        if (r.depart_date < today) return false;
+        if (r.return_date) {
+          const nights = daysBetween(r.depart_date, r.return_date);
+          if (nights < 3 || nights > 45) return false;
+        }
+        return true;
+      })
+      .map((row) => {
+        const returnDate =
+          row.return_date ?? addDays(isoDate(row.depart_date), request.tripDuration.minDays);
+        return this.toFlightOffer(request, destination, returnDate, currency, row);
+      })
+      .filter((o): o is FlightOffer => o !== null);
+  }
+
+  /** Réponse `period_type=month` pour un couple route/mois, mémoïsée par run. */
+  private async fetchMonthRows(
+    origin: string,
+    destination: string,
+    month: string,
+    currency: string,
+  ): Promise<TpPriceRow[]> {
+    const key = `${origin}|${destination}|${month}|${currency}`;
+    const nowMs = Date.parse(this.now());
+    const cached = this.monthCache.get(key);
+    if (cached && nowMs - cached.atMs < TravelpayoutsProvider.CACHE_TTL_MS) return cached.rows;
+
     // Travelpayouts a retiré l'auth par `?token=` sur la Data API (HTTP 400) :
     // le jeton passe désormais par l'en-tête `X-Access-Token`. `trip_class` est
     // toujours `0` (garde économie faite en amont dans `searchFlights`).
     const params = new URLSearchParams({
-      currency: request.currency.toLowerCase(),
-      origin: request.origin,
+      currency: currency.toLowerCase(),
+      origin,
       destination,
       period_type: "month",
-      beginning_of_period: `${windowStart.slice(0, 7)}-01`,
+      beginning_of_period: `${month}-01`,
       one_way: "false",
       trip_class: "0",
       limit: "1000",
@@ -183,26 +228,9 @@ export class TravelpayoutsProvider implements FlightProvider {
       });
     }
 
-    // `period_type=month` renvoie les meilleurs tarifs de tout le mois, dates
-    // variées : on garde ceux dont le départ tombe dans la fenêtre demandée et
-    // dont la durée de séjour respecte `tripDuration`.
-    const { minDays, maxDays } = request.tripDuration;
-    const currency = (parsed.data.currency ?? request.currency).toUpperCase();
-    return parsed.data.data
-      .filter((r) => {
-        if (r.trip_class !== undefined && r.trip_class !== 0) return false;
-        if (r.depart_date < windowStart || r.depart_date > windowEnd) return false;
-        if (r.return_date) {
-          const days = daysBetween(r.depart_date, r.return_date);
-          if (days < minDays || days > maxDays) return false;
-        }
-        return true;
-      })
-      .map((row) => {
-        const returnDate = row.return_date ?? addDays(isoDate(row.depart_date), minDays);
-        return this.toFlightOffer(request, destination, returnDate, currency, row);
-      })
-      .filter((o): o is FlightOffer => o !== null);
+    const rows = parsed.data.data;
+    this.monthCache.set(key, { rows, atMs: nowMs });
+    return rows;
   }
 
   private toFlightOffer(
