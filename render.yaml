@@ -63,10 +63,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Résolu automatiquement vers le hostname public de l'API ci-dessus.
-      # `next.config.mjs` préfixe `https://` si le protocole manque.
+      # URL publique de l'API ci-dessus. `render.yaml` ne sait pas composer une
+      # URL complète via `fromService` (il ne fournit qu'un hostname interne),
+      # donc on la fixe. À ajuster si Render suffixe le nom du service `fbr-api`.
       - key: API_INTERNAL_URL
-        fromService:
-          type: web
-          name: fbr-api
-          property: host
+        value: https://fbr-api.onrender.com
