@@ -25,6 +25,9 @@ jobs:
       # Source de données réelle (gratuite). Sans elle, le provider mock est utilisé.
       TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
       TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+      # SerpApi (payant) — actif dès que la clé est présente, sur les recherches
+      # point-à-point seulement (3 cabines / passage, intervalle plancher 6 h).
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       # Notifications (chaque canal s'active si toute sa config est présente)
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
