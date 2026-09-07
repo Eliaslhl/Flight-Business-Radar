@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AirportInput } from "./airport-input";
 import { Button, Card, Field, Input, Select } from "./ui";
+import { flagEmoji } from "@/lib/flags";
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/query-keys";
 import type { CabinClass, CreateSearchInput } from "@/lib/types";
@@ -43,7 +44,9 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   };
   const removeDest = (iata: string) => setDests((d) => d.filter((x) => x !== iata));
 
-  const cityOf = (iata: string): string | undefined => list.find((a) => a.iata === iata)?.city;
+  const airportOf = (iata: string) => list.find((a) => a.iata === iata);
+  const cityOf = (iata: string): string | undefined => airportOf(iata)?.city;
+  const flagOf = (iata: string): string => flagEmoji(airportOf(iata)?.countryCode);
 
   const mutation = useMutation({
     mutationFn: (body: CreateSearchInput) => api.createSearch(body),
@@ -98,6 +101,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
                   key={d}
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] py-0.5 pr-1 pl-2 text-xs text-[var(--color-accent)]"
                 >
+                  {flagOf(d) ? <span aria-hidden>{flagOf(d)}</span> : null}
                   <span className="font-mono font-medium">{d}</span>
                   {cityOf(d) ? <span className="opacity-70">{cityOf(d)}</span> : null}
                   <button

@@ -65,9 +65,14 @@ describe("api /health", () => {
   it("GET /api/airports expose le référentiel d'autocomplétion", async () => {
     const res = await app.inject({ method: "GET", url: "/api/airports" });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ count: number; airports: { iata: string; city: string }[] }>();
+    const body = res.json<{
+      count: number;
+      airports: { iata: string; city: string; countryCode: string }[];
+    }>();
     expect(body.count).toBe(body.airports.length);
     expect(body.count).toBeGreaterThan(100);
-    expect(body.airports.some((a) => a.iata === "CDG" && a.city.includes("Paris"))).toBe(true);
+    const cdg = body.airports.find((a) => a.iata === "CDG");
+    expect(cdg?.city).toContain("Paris");
+    expect(cdg?.countryCode).toBe("FR");
   });
 });

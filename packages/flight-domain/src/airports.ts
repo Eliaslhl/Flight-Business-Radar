@@ -105,6 +105,119 @@ export const SEED_DESTINATION_CODES: readonly string[] = CDG_LONGHAUL_DESTINATIO
   (a) => a.iata,
 );
 
+/** Codes IATA de la liste seed pour une région donnée (ordre stable). */
+export const seedCodesForRegion = (region: WorldRegion): string[] =>
+  CDG_LONGHAUL_DESTINATIONS.filter((a) => a.region === region).map((a) => a.iata);
+
+// ─── Pays → code ISO / drapeau ──────────────────────────────────────────
+
+/**
+ * Nom de pays (en français, tel qu'écrit dans ce fichier) → code ISO 3166-1
+ * alpha-2. Sert à afficher un drapeau à côté d'une ville / d'un pays.
+ */
+export const COUNTRY_CODE: Readonly<Record<string, string>> = {
+  "Afrique du Sud": "ZA",
+  Algérie: "DZ",
+  Allemagne: "DE",
+  "Arabie saoudite": "SA",
+  Argentine: "AR",
+  Australie: "AU",
+  Autriche: "AT",
+  Bahreïn: "BH",
+  Bangladesh: "BD",
+  Belgique: "BE",
+  Brésil: "BR",
+  Bulgarie: "BG",
+  Canada: "CA",
+  Chili: "CL",
+  Chine: "CN",
+  Colombie: "CO",
+  "Corée du Sud": "KR",
+  Croatie: "HR",
+  Cuba: "CU",
+  "Côte d'Ivoire": "CI",
+  Danemark: "DK",
+  Espagne: "ES",
+  Fidji: "FJ",
+  Finlande: "FI",
+  France: "FR",
+  Ghana: "GH",
+  Grèce: "GR",
+  Guadeloupe: "GP",
+  Guyane: "GF",
+  "Hong Kong": "HK",
+  Hongrie: "HU",
+  Inde: "IN",
+  Indonésie: "ID",
+  Irlande: "IE",
+  Islande: "IS",
+  Israël: "IL",
+  Italie: "IT",
+  Japon: "JP",
+  Jordanie: "JO",
+  Kazakhstan: "KZ",
+  Kenya: "KE",
+  Koweït: "KW",
+  "La Réunion": "RE",
+  Liban: "LB",
+  Luxembourg: "LU",
+  Malaisie: "MY",
+  Maldives: "MV",
+  Malte: "MT",
+  Maroc: "MA",
+  Martinique: "MQ",
+  Maurice: "MU",
+  Mexique: "MX",
+  Nigeria: "NG",
+  Norvège: "NO",
+  "Nouvelle-Calédonie": "NC",
+  "Nouvelle-Zélande": "NZ",
+  Népal: "NP",
+  Oman: "OM",
+  Panama: "PA",
+  "Pays-Bas": "NL",
+  Philippines: "PH",
+  Pologne: "PL",
+  "Polynésie française": "PF",
+  Portugal: "PT",
+  Pérou: "PE",
+  Qatar: "QA",
+  Roumanie: "RO",
+  "Royaume-Uni": "GB",
+  Serbie: "RS",
+  Seychelles: "SC",
+  Singapour: "SG",
+  "Sri Lanka": "LK",
+  Suisse: "CH",
+  Suède: "SE",
+  Sénégal: "SN",
+  Tanzanie: "TZ",
+  Taïwan: "TW",
+  Tchéquie: "CZ",
+  Thaïlande: "TH",
+  Tunisie: "TN",
+  Turquie: "TR",
+  "Viêt Nam": "VN",
+  Égypte: "EG",
+  "Émirats arabes unis": "AE",
+  Équateur: "EC",
+  "États-Unis": "US",
+  Éthiopie: "ET",
+};
+
+/** Code ISO 3166-1 alpha-2 du pays, ou `""` si inconnu. */
+export const countryCodeOf = (country: string): string => COUNTRY_CODE[country] ?? "";
+
+/**
+ * Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (paire d'indicateurs
+ * régionaux Unicode). `""` si le code est invalide.
+ */
+export const flagEmoji = (iso2: string): string => {
+  const c = iso2.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return "";
+  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+};
+
 // ─── Référentiel d'aéroports (autocomplétion) ────────────────────────────
 
 export interface Airport {

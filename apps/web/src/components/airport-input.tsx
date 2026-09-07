@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "./ui";
+import { flagEmoji } from "@/lib/flags";
 import type { WorldAirport } from "@/lib/types";
 
 const norm = (s: string): string =>
@@ -116,10 +117,13 @@ export function AirportInput({ value, onSelect, airports, placeholder, id }: Air
                 // évite que le blur de l'input ferme la liste avant le clic
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(a)}
-                className={`flex w-full items-baseline gap-2 px-3 py-1.5 text-left ${
+                className={`flex w-full cursor-pointer items-baseline gap-2 px-3 py-1.5 text-left ${
                   i === hi ? "bg-[var(--color-accent-soft)]" : "hover:bg-[var(--color-surface-2)]"
                 }`}
               >
+                <span aria-hidden className="shrink-0">
+                  {flagEmoji(a.countryCode) || "🏳️"}
+                </span>
                 <span className="font-mono font-medium">{a.iata}</span>
                 <span className="truncate text-[var(--color-muted)]">
                   {a.city}

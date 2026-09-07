@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AirportInput } from "@/components/airport-input";
+import { CABIN_LABEL } from "@/components/create-search-form";
 import {
   Badge,
   Button,
@@ -14,13 +15,21 @@ import {
   Field,
   Input,
   PageHeader,
+  Select,
   Skeleton,
   Spinner,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { flagEmoji } from "@/lib/flags";
 import { formatDate, formatEur } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import type { CreateSearchInput, RadarDestinationRank, Search, SeedAirport } from "@/lib/types";
+import type {
+  CabinClass,
+  CreateSearchInput,
+  RadarDestinationRank,
+  Search,
+  SeedAirport,
+} from "@/lib/types";
 
 const REGION_LABEL: Record<string, string> = {
   ASIA: "Asie",
@@ -32,15 +41,21 @@ const REGION_LABEL: Record<string, string> = {
   INDIAN_OCEAN: "Océan Indien",
 };
 
+const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
+
+/** Une recherche « radar » : sans destination, ou libellée « Radar … ». */
+const isRadarSearch = (s: Search): boolean =>
+  s.destinations.length === 0 || (s.label ?? "").startsWith("Radar ");
+
 export default function RadarPage() {
   const qc = useQueryClient();
   const searches = useQuery({ queryKey: qk.searches, queryFn: api.listSearches });
   const seed = useQuery({ queryKey: qk.radarDestinations, queryFn: api.radarDestinations });
 
-  const radarSearch: Search | undefined = useMemo(
-    () => (searches.data ?? []).find((s) => s.destinations.length === 0),
-    [searches.data],
-  );
+  const radarSearches = useMemo(() => (searches.data ?? []).filter(isRadarSearch), [searches.data]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const radarSearch: Search | undefined =
+    radarSearches.find((s) => s.id === selectedId) ?? radarSearches[0];
 
   const ranking = useQuery({
     queryKey: qk.recommendations(radarSearch?.id ?? "none"),
@@ -105,6 +120,21 @@ export default function RadarPage() {
           <CardTitle aside={ranking.data ? `${ranking.data.sampleSize} observations` : undefined}>
             Classement des destinations
           </CardTitle>
+          {radarSearches.length > 1 ? (
+            <div className="mb-3">
+              <Select
+                className="max-w-xs"
+                value={radarSearch.id}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {radarSearches.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label ?? `${s.origin} → Radar`}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
           {ranking.isLoading ? (
             <Spinner />
           ) : ranking.isError ? (
@@ -120,7 +150,11 @@ export default function RadarPage() {
               Le radar n&apos;a pas encore collecté de prix pour cette recherche.
             </EmptyState>
           ) : (
-            <RankingTable rows={ranking.data!.radar!} searchId={radarSearch.id} />
+            <RankingTable
+              rows={ranking.data!.radar!}
+              searchId={radarSearch.id}
+              seed={seed.data?.destinations ?? []}
+            />
           )}
         </Card>
       )}
@@ -146,6 +180,7 @@ export default function RadarPage() {
                       title={`${a.city}, ${a.country}`}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-0.5 text-xs"
                     >
+                      <span aria-hidden>{flagEmoji(a.countryCode) || "🏳️"}</span>
                       <span className="font-mono font-medium">{a.iata}</span>
                       <span className="text-[var(--color-muted)]">{a.city}</span>
                     </span>
@@ -160,7 +195,16 @@ export default function RadarPage() {
   );
 }
 
-function RankingTable({ rows, searchId }: { rows: RadarDestinationRank[]; searchId: string }) {
+function RankingTable({
+  rows,
+  searchId,
+  seed,
+}: {
+  rows: RadarDestinationRank[];
+  searchId: string;
+  seed: SeedAirport[];
+}) {
+  const byIata = new Map(seed.map((a) => [a.iata, a]));
   return (
     <div className="-mx-5 overflow-x-auto">
       <table className="w-full min-w-[36rem] text-sm">
@@ -181,9 +225,17 @@ function RankingTable({ rows, searchId }: { rows: RadarDestinationRank[]; search
               <td className="px-5 py-2.5">
                 <Link
                   href={`/searches/${searchId}`}
-                  className="font-mono font-medium hover:text-[var(--color-accent)]"
+                  className="inline-flex items-center gap-1.5 font-medium hover:text-[var(--color-accent)]"
                 >
-                  {r.destination}
+                  <span aria-hidden>
+                    {flagEmoji(byIata.get(r.destination)?.countryCode) || "🏳️"}
+                  </span>
+                  <span className="font-mono">{r.destination}</span>
+                  {byIata.get(r.destination) ? (
+                    <span className="text-[var(--color-muted)]">
+                      {byIata.get(r.destination)!.city}
+                    </span>
+                  ) : null}
                 </Link>
               </td>
               <td className="tnum px-5 py-2.5 font-medium">{formatEur(r.latestPriceEurCents)}</td>
@@ -211,8 +263,16 @@ function RankingTable({ rows, searchId }: { rows: RadarDestinationRank[]; search
 function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
   const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
   const airportList = airports.data ?? [];
+  const seed = useQuery({ queryKey: qk.radarDestinations, queryFn: api.radarDestinations });
+  const regions = useMemo(() => {
+    const set = new Set((seed.data?.destinations ?? []).map((d) => d.region));
+    return [...set];
+  }, [seed.data]);
+
   const [form, setForm] = useState({
     origin: "CDG",
+    continent: "ALL",
+    cabinClass: "ECONOMY" as CabinClass,
     start: "",
     end: "",
     minDays: "7",
@@ -223,12 +283,17 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
 
   const create = useMutation({
     mutationFn: async () => {
+      const region = form.continent === "ALL" ? null : form.continent;
+      const dests = region
+        ? (seed.data?.destinations ?? []).filter((d) => d.region === region).map((d) => d.iata)
+        : [];
       const body: CreateSearchInput = {
-        label: `Radar ${form.origin.toUpperCase()}`,
+        label: `Radar ${form.origin.toUpperCase()}${
+          region ? ` · ${REGION_LABEL[region] ?? region}` : ""
+        }`,
         origin: form.origin.trim().toUpperCase(),
-        destinations: [],
-        // La source gratuite (Travelpayouts) ne sert que l'économie.
-        cabinClass: "ECONOMY",
+        destinations: dests,
+        cabinClass: form.cabinClass,
         departureWindow: { start: form.start, end: form.end },
         tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
       };
@@ -242,8 +307,10 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
     <Card>
       <CardTitle>Activer le radar</CardTitle>
       <p className="mb-4 text-sm text-[var(--color-muted)]">
-        Crée une recherche <strong>sans destination</strong> : le worker sonde une tranche tournante
-        de la liste ci-dessous et construit le classement au fil des analyses.
+        <strong>Tous les continents</strong> : une recherche sans destination, le worker sonde une
+        tranche tournante de la liste ci-dessous. <strong>Un continent</strong> : une recherche
+        ciblant ses villes, classées par prix. La source gratuite ne renvoie des tarifs qu&apos;en{" "}
+        <strong>économie</strong>.
       </p>
       <form
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
@@ -258,6 +325,25 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
             onSelect={(iata) => setForm((f) => ({ ...f, origin: iata }))}
             airports={airportList}
           />
+        </Field>
+        <Field label="Continent">
+          <Select value={form.continent} onChange={set("continent")}>
+            <option value="ALL">Tous les continents</option>
+            {regions.map((r) => (
+              <option key={r} value={r}>
+                {REGION_LABEL[r] ?? r}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Classe">
+          <Select value={form.cabinClass} onChange={set("cabinClass")}>
+            {CABINS.map((c) => (
+              <option key={c} value={c}>
+                {CABIN_LABEL[c]}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Durée min (j)">
           <Input type="number" min={1} value={form.minDays} onChange={set("minDays")} />
