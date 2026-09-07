@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -59,7 +59,7 @@ export function ConfirmedDropsChart({
 
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={2}>
+      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
         <XAxis
           dataKey="day"
@@ -89,19 +89,25 @@ export function ConfirmedDropsChart({
           formatter={(v: string) => (v === "confirmed" ? "Confirmées" : "Détectées")}
           wrapperStyle={{ fontSize: 11 }}
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="detected"
-          fill="var(--color-accent-muted)"
-          radius={[3, 3, 0, 0]}
+          stroke="var(--color-accent-muted)"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 3 }}
           isAnimationActive={false}
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="confirmed"
-          fill="var(--color-accent)"
-          radius={[3, 3, 0, 0]}
+          stroke="var(--color-accent)"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 3 }}
           isAnimationActive={false}
         />
-      </BarChart>
+      </LineChart>
     </ResponsiveContainer>
   );
 }

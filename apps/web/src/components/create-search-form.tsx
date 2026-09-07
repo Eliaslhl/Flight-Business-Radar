@@ -9,6 +9,13 @@ import { qk } from "@/lib/query-keys";
 import type { CabinClass, CreateSearchInput } from "@/lib/types";
 
 const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
+export const CABIN_LABEL: Record<CabinClass, string> = {
+  ECONOMY: "Économie",
+  PREMIUM_ECONOMY: "Économie premium",
+  BUSINESS: "Affaires",
+  FIRST: "Première",
+};
+const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
 export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   const qc = useQueryClient();
@@ -117,7 +124,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
           <Select value={form.cabinClass} onChange={set("cabinClass")}>
             {CABINS.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {CABIN_LABEL[c]}
               </option>
             ))}
           </Select>
@@ -126,10 +133,29 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
           <Input type="number" min={0} max={4} value={form.maxStops} onChange={set("maxStops")} />
         </Field>
         <Field label="Début de fenêtre">
-          <Input type="date" value={form.start} onChange={set("start")} required />
+          <Input
+            type="date"
+            min={todayISO()}
+            value={form.start}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                start: e.target.value,
+                // garde une fin cohérente : jamais avant le nouveau début
+                end: f.end && f.end < e.target.value ? e.target.value : f.end,
+              }))
+            }
+            required
+          />
         </Field>
         <Field label="Fin de fenêtre">
-          <Input type="date" value={form.end} onChange={set("end")} required />
+          <Input
+            type="date"
+            min={form.start || todayISO()}
+            value={form.end}
+            onChange={set("end")}
+            required
+          />
         </Field>
         <Field label="Durée min (jours)">
           <Input type="number" min={1} value={form.minDays} onChange={set("minDays")} />

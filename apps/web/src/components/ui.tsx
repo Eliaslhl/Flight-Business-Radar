@@ -36,7 +36,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius)] font-medium transition",
+        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius)] font-medium transition",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]",
         "disabled:cursor-not-allowed disabled:opacity-50",
         BUTTON_SIZES[size],
@@ -159,12 +159,32 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
 const CONTROL =
   "w-full rounded-[var(--radius)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-fg)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]";
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(CONTROL, className)} {...props} />;
+/** Types de champ où un curseur « main » est plus juste qu'un curseur texte. */
+const POINTER_INPUT_TYPES = new Set([
+  "date",
+  "datetime-local",
+  "time",
+  "week",
+  "month",
+  "checkbox",
+  "radio",
+  "range",
+  "color",
+  "file",
+]);
+
+export function Input({ className, type, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      type={type}
+      className={cx(CONTROL, type && POINTER_INPUT_TYPES.has(type) && "cursor-pointer", className)}
+      {...props}
+    />
+  );
 }
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cx(CONTROL, "appearance-none", className)} {...props} />;
+  return <select className={cx(CONTROL, "cursor-pointer appearance-none", className)} {...props} />;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
