@@ -21,7 +21,9 @@ services:
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
         - turbo.json
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @fbr/api... build
+    # `--prod=false` : Render force NODE_ENV=production, ce qui ferait sauter les
+    # devDependencies (dont @types/node, tailwind…) nécessaires à la compilation.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @fbr/api... build
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     envVars:
@@ -55,7 +57,7 @@ services:
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
         - turbo.json
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @fbr/web... build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @fbr/web... build
     startCommand: pnpm --filter @fbr/web exec next start -p $PORT
     healthCheckPath: /
     envVars:
