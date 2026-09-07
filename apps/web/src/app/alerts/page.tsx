@@ -34,7 +34,11 @@ export default function AlertsPage() {
     mutationFn: ({ id, searchId }: { id: string; searchId: string }) =>
       api.deleteAlert(id).then(() => searchId),
     onSuccess: (searchId) => void qc.invalidateQueries({ queryKey: qk.alerts(searchId) }),
+    onError: () => window.alert("Suppression impossible — réessaie dans un instant."),
   });
+  const askRemove = (id: string, searchId: string) => {
+    if (window.confirm("Supprimer cette alerte ?")) remove.mutate({ id, searchId });
+  };
 
   return (
     <div className="space-y-6">
@@ -98,9 +102,12 @@ export default function AlertsPage() {
                       </Button>
                       <Button
                         variant="danger"
-                        onClick={() => remove.mutate({ id: alert.id, searchId: search.id })}
+                        onClick={() => askRemove(alert.id, search.id)}
+                        disabled={remove.isPending && remove.variables?.id === alert.id}
                       >
-                        Suppr.
+                        {remove.isPending && remove.variables?.id === alert.id
+                          ? "Suppr.…"
+                          : "Suppr."}
                       </Button>
                     </div>
                   </td>

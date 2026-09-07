@@ -37,7 +37,11 @@ export function AlertsPanel({ searchId }: { searchId: string }) {
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteAlert(id),
     onSuccess: invalidate,
+    onError: () => window.alert("Suppression impossible — réessaie dans un instant."),
   });
+  const askRemove = (id: string) => {
+    if (window.confirm("Supprimer cette alerte ?")) remove.mutate(id);
+  };
 
   const rows = alerts.data ?? [];
 
@@ -80,11 +84,18 @@ export function AlertsPanel({ searchId }: { searchId: string }) {
                 </span>
               </div>
               <div className="flex gap-1.5">
-                <Button onClick={() => toggle.mutate({ id: a.id, enabled: a.enabled })}>
+                <Button
+                  onClick={() => toggle.mutate({ id: a.id, enabled: a.enabled })}
+                  disabled={toggle.isPending}
+                >
                   {a.enabled ? "Désactiver" : "Activer"}
                 </Button>
-                <Button variant="danger" onClick={() => remove.mutate(a.id)}>
-                  Suppr.
+                <Button
+                  variant="danger"
+                  onClick={() => askRemove(a.id)}
+                  disabled={remove.isPending && remove.variables === a.id}
+                >
+                  {remove.isPending && remove.variables === a.id ? "Suppr.…" : "Suppr."}
                 </Button>
               </div>
             </li>

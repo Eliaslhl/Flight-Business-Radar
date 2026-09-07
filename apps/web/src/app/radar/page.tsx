@@ -266,10 +266,28 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
           <Input type="number" min={1} value={form.maxDays} onChange={set("maxDays")} />
         </Field>
         <Field label="Fenêtre — début">
-          <Input type="date" value={form.start} onChange={set("start")} required />
+          <Input
+            type="date"
+            min={new Date().toISOString().slice(0, 10)}
+            value={form.start}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                start: e.target.value,
+                end: f.end && f.end < e.target.value ? e.target.value : f.end,
+              }))
+            }
+            required
+          />
         </Field>
         <Field label="Fenêtre — fin">
-          <Input type="date" value={form.end} onChange={set("end")} required />
+          <Input
+            type="date"
+            min={form.start || new Date().toISOString().slice(0, 10)}
+            value={form.end}
+            onChange={set("end")}
+            required
+          />
         </Field>
         <div className="col-span-2 flex items-center gap-3 sm:col-span-4">
           <Button type="submit" variant="primary" disabled={create.isPending}>
