@@ -16,6 +16,7 @@ import {
   type SearchRow,
 } from "@fbr/database";
 import {
+  DATE_FLEX_DAYS,
   daysBetween,
   isoDate,
   offerMaxStops,
@@ -274,6 +275,9 @@ export const processSearchRun = async (
       // Plus de filtre par cabine : on garde toutes les cabines (Éco / Éco+ /
       // Affaires) et l'UI affiche les 3 moins chères, cabine mélangée.
       requireCabinMatch: false,
+      // Aller / retour à ± 1 jour si le tarif y est meilleur (dates saisies
+      // restées le point de référence).
+      dateToleranceDays: DATE_FLEX_DAYS,
     });
     offersKept += normalized.offers.length;
 

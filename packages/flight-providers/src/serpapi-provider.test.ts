@@ -142,6 +142,48 @@ describe("SerpApiFlightProvider", () => {
     expect(fetchImpl.mock.calls.map(travelClassOf).sort()).toEqual(["1", "2", "3"]);
   });
 
+  it("dateFlexDays: 1 ⇒ sonde J-1 / J / J+1 × 3 cabines, retour décalé d'autant", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ best_flights: [], other_flights: [] }));
+    await new SerpApiFlightProvider({
+      apiKey: "k",
+      fetchImpl,
+      dateFlexDays: 1,
+      now: () => NOW,
+    }).searchFlights(
+      request({
+        departureWindow: { start: "2026-11-10", end: "2026-11-10" },
+        tripDuration: { minDays: 12, maxDays: 12 },
+      }),
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(9); // 3 dates × 3 cabines
+
+    const pairs = fetchImpl.mock.calls.map((c) => {
+      const q = new URL((c as [string])[0]).searchParams;
+      return `${q.get("outbound_date") ?? ""}→${q.get("return_date") ?? ""}`;
+    });
+    expect([...new Set(pairs)].sort()).toEqual([
+      "2026-11-09→2026-11-21",
+      "2026-11-10→2026-11-22",
+      "2026-11-11→2026-11-23",
+    ]);
+  });
+
+  it("dateFlexDays: 1 ⇒ ignore une date de départ déjà passée", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ best_flights: [], other_flights: [] }));
+    await new SerpApiFlightProvider({
+      apiKey: "k",
+      fetchImpl,
+      dateFlexDays: 1,
+      now: () => "2026-11-10T08:00:00.000Z",
+    }).searchFlights(
+      request({
+        departureWindow: { start: "2026-11-10", end: "2026-11-10" },
+        tripDuration: { minDays: 12, maxDays: 12 },
+      }),
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(6); // J-1 passé ⇒ J et J+1 seulement × 3 cabines
+  });
+
   it("convertit la réponse SerpApi en FlightOffer[] (contract test)", async () => {
     const fetchImpl = cabinAwareFetch();
     const provider = new SerpApiFlightProvider({ apiKey: "sk-serp", fetchImpl, now: () => NOW });
