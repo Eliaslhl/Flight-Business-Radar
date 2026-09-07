@@ -6,6 +6,8 @@ import type {
   Health,
   Notification,
   NotificationChannelsStatus,
+  RecommendationReport,
+  SeedAirport,
   PriceEvent,
   PriceSnapshot,
   Search,
@@ -70,6 +72,12 @@ export const api = {
       (r) => r.prices,
     ),
   analytics: (id: string) => request<AnalyticsReport>(`/api/searches/${id}/analytics`),
+  recommendations: (id: string) =>
+    request<RecommendationReport>(`/api/searches/${id}/recommendations`),
+  radarDestinations: () =>
+    request<{ origin: string; count: number; destinations: SeedAirport[] }>(
+      "/api/radar/destinations",
+    ),
   events: (id: string) =>
     request<{ events: PriceEvent[] }>(`/api/searches/${id}/events`).then((r) => r.events),
   notifications: (id: string) =>

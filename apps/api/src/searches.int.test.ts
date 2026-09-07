@@ -207,6 +207,43 @@ suite("API /api/searches (intégration Postgres)", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("/recommendations : INSUFFICIENT_DATA sans historique, 404 si inconnue", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({ method: "GET", url: `/api/searches/${id}/recommendations` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{
+      currency: string;
+      sampleSize: number;
+      opportunity: { score: number | null; band: string };
+      dates: unknown[];
+      radar: unknown;
+    }>();
+    expect(body.currency).toBe("EUR");
+    expect(body.sampleSize).toBe(0);
+    expect(body.opportunity.band).toBe("INSUFFICIENT_DATA");
+    expect(body.opportunity.score).toBeNull();
+    expect(body.dates).toEqual([]);
+    expect(body.radar).toBeNull();
+
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/searches/00000000-0000-0000-0000-0000000000ff/recommendations",
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it("/recommendations d'une recherche Radar renvoie une section radar (vide au départ)", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/searches",
+      payload: { ...validBody, destinations: [] },
+    });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({ method: "GET", url: `/api/searches/${id}/recommendations` });
+    expect(res.json<{ radar: unknown[] }>().radar).toEqual([]);
+  });
+
   it("404 sur une recherche inconnue", async () => {
     const res = await app.inject({
       method: "GET",

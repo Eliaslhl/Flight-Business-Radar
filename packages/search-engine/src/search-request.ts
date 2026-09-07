@@ -35,6 +35,14 @@ const money = (
 ): { amount: number; currency: string } | undefined =>
   cents === null ? undefined : { amount: cents, currency };
 
+export interface BuildRequestOptions {
+  /**
+   * Remplace les destinations de la recherche (mode Radar : le worker sonde une
+   * tranche rotative de la liste seed au lieu d'aucune destination).
+   */
+  readonly destinations?: readonly string[];
+}
+
 /**
  * Construit une `FlightSearchRequest` ciblant **exactement** une combinaison de
  * dates (fenêtre réduite à un jour, durée de séjour fixée). Lève si le résultat
@@ -43,6 +51,7 @@ const money = (
 export const buildRequestForCombination = (
   search: SearchLike,
   combo: CombinationLike,
+  options: BuildRequestOptions = {},
 ): FlightSearchRequest => {
   const outbound = isoDate(combo.outboundDate);
   const tripDays =
@@ -51,7 +60,7 @@ export const buildRequestForCombination = (
 
   return flightSearchRequestSchema.parse({
     origin: search.origin,
-    destinations: [...search.destinations],
+    destinations: [...(options.destinations ?? search.destinations)],
     cabinClass: search.cabinClass,
     departureWindow: { start: outbound, end: outbound },
     tripDuration: { minDays: tripDays, maxDays: tripDays },

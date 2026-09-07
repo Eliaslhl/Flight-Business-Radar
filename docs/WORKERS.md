@@ -50,6 +50,7 @@ L'API (`POST /api/searches/:id/run`) peut enfiler un job `reason: "manual"` imm�
 1. charge la recherche ; ignore un job `scheduled` si `status !== ACTIVE` ;
 2. génère les combinaisons de dates si absentes (`generateDateCombinations`) ;
 3. sélectionne les `combinationsPerRun` combinaisons prioritaires (`pickCombinations` : jamais vérifiées d'abord, puis score) ;
+   - **mode Radar** (recherche sans destination) : ne garde qu'un couple de dates, mais l'éclate sur `radarDestinationSlice(⌊runAt / 10 min⌋, RADAR_BATCH_SIZE)` — une tranche rotative de la liste seed CDG long-courrier (`@fbr/flight-domain`). Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md) ;
 4. pour chaque combinaison : `buildRequestForCombination` → `registry.searchAll` → `normalizeSearchResults` ; chaque `outcome` (succès **ou** échec) est bufferisé pour `provider_requests` ;
 5. `upsertOffer` + `upsertProviderLink` + **INSERT** `price_snapshots` (jamais d'écrasement), avec `price_eur_cents` normalisé par `FxService` (`@fbr/fx`) ;
 6. `insertProviderRequests` (journal d'observabilité : `provider, ok, offer_count, latency_ms, error_code/message`) puis `markCombinationsChecked` ;
@@ -78,6 +79,7 @@ Départ imminent (`daysUntilDeparture ≤ 10`) → resserre d'un cran. Jitter ±
 | `SCHEDULER_INTERVAL_MS`                                                       | 15000                  | Période de scan des recherches dues                                     |
 | `SEARCH_WORKER_CONCURRENCY`                                                   | 4                      | Jobs `search.run` traités en parallèle                                  |
 | `SEARCH_COMBINATIONS_PER_RUN`                                                 | 6                      | Combinaisons sondées par exécution                                      |
+| `RADAR_BATCH_SIZE`                                                            | 8                      | Mode Radar : destinations seed sondées par run (tranche rotative)       |
 | `PROVIDER_MIN_INTERVAL_SECONDS`                                               | 60                     | Plancher d'intervalle (rate limit provider)                             |
 | `MOCK_SCENARIO`                                                               | normal                 | Scénario du `MockFlightProvider` (si `FAST_FLIGHTS_URL` absent)         |
 | `FAST_FLIGHTS_URL`                                                            | _(vide)_               | URL du sidecar `services/flight-scraper` → active `FastFlightsProvider` |

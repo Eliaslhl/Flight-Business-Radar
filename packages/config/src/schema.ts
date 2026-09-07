@@ -77,6 +77,8 @@ export const configSchema = z
     SEARCH_WORKER_CONCURRENCY: posInt.default(4),
     SEARCH_COMBINATIONS_PER_RUN: posInt.default(6),
     PROVIDER_MIN_INTERVAL_SECONDS: posInt.default(60),
+    /** Mode Radar : destinations seed sondées par run (tranche rotative). */
+    RADAR_BATCH_SIZE: posInt.max(60).default(8),
     // Scénario du MockFlightProvider tant qu'aucun provider réel n'est branché (Phase 7).
     MOCK_SCENARIO: z
       .enum([
@@ -146,6 +148,7 @@ export const configSchema = z
       searchWorkerConcurrency: raw.SEARCH_WORKER_CONCURRENCY,
       combinationsPerRun: raw.SEARCH_COMBINATIONS_PER_RUN,
       providerMinIntervalSeconds: raw.PROVIDER_MIN_INTERVAL_SECONDS,
+      radarBatchSize: raw.RADAR_BATCH_SIZE,
       mockScenario: raw.MOCK_SCENARIO,
     },
     providers: {

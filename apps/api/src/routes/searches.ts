@@ -16,7 +16,12 @@ import {
   type Database,
   type SearchRow,
 } from "@fbr/database";
-import { buildAnalyticsReport, type PriceObservation } from "@fbr/analytics";
+import {
+  buildAnalyticsReport,
+  buildRecommendationReport,
+  type PriceObservation,
+  type RecommendationObservation,
+} from "@fbr/analytics";
 import { enqueueSearchRun, type Queue, type SearchRunJobData } from "@fbr/queue";
 import { generateDateCombinations } from "@fbr/search-engine";
 import { type Logger } from "@fbr/shared";
@@ -210,6 +215,28 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
     return buildAnalyticsReport(observations, {
       minSampleSize: deps.analyticsMinSample,
       overallMinSampleSize: deps.analyticsMinSample,
+    });
+  });
+
+  app.get("/api/searches/:id/recommendations", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const rows = await listObservationsForAnalytics(db, id);
+    const observations: RecommendationObservation[] = rows.map((o) => ({
+      priceEurCents: o.priceEurCents,
+      observedAt: o.observedAt.toISOString(),
+      outboundDate: o.outboundDate,
+      returnDate: o.returnDate,
+      tripDays: o.tripDays,
+      destination: o.destination,
+    }));
+    return buildRecommendationReport(observations, {
+      departureWindowStart: row.departureWindowStart,
+      targetEurCents: row.targetPriceCents,
+      maxEurCents: row.maxPriceCents,
+      minSampleSize: deps.analyticsMinSample,
+      radar: row.destinations.length === 0,
     });
   });
 

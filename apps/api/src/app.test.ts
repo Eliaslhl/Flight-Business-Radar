@@ -47,4 +47,18 @@ describe("api /health", () => {
     expect(body.channels.find((c) => c.name === "TELEGRAM")?.configured).toBe(false);
     expect(JSON.stringify(body)).not.toMatch(/token|smtp|password|secret/i);
   });
+
+  it("GET /api/radar/destinations expose la liste seed CDG long-courrier", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/radar/destinations" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{
+      origin: string;
+      count: number;
+      destinations: { iata: string; city: string; region: string }[];
+    }>();
+    expect(body.origin).toBe("CDG");
+    expect(body.count).toBe(body.destinations.length);
+    expect(body.count).toBeGreaterThanOrEqual(40);
+    expect(body.destinations.every((d) => /^[A-Z]{3}$/.test(d.iata))).toBe(true);
+  });
 });

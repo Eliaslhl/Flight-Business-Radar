@@ -17,8 +17,8 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 | 6     | Frontend : dashboard Next.js, graphiques, alertes                                                | ✅ Terminée  |
 | 7     | Real providers : sidecar Python `fast-flights` (fixture + live best-effort), `provider_requests` | ✅ Terminée  |
 | 8     | Notifications : canaux Telegram / Email (SMTP) / Webhook, retry, auto-activation par config      | ✅ Terminée  |
-| 9     | Smart recommendations : opportunity score, dates, Radar                                          | 🟢 Prochaine |
-| 10    | AI Advisor                                                                                       | ⏳           |
+| 9     | Smart recommendations : opportunity score, top-3 dates, mode Radar (classement destinations)     | ✅ Terminée  |
+| 10    | AI Advisor                                                                                       | 🟢 Prochaine |
 
 ## Prérequis
 
@@ -100,7 +100,7 @@ packages/
   database/         schéma Drizzle + client postgres.js + migrations + repositories
 services/
   flight-scraper/   sidecar Python (FastAPI) isolant le scraper Google Flights `fast-flights`
-docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
+docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDATIONS, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
 ```
 
 ## Scripts racine

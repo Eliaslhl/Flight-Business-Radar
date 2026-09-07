@@ -207,6 +207,8 @@ export const getOfferPriceAggregate = async (
 export interface AnalyticsObservation {
   priceEurCents: number;
   observedAt: Date;
+  origin: string;
+  destination: string;
   outboundDate: string;
   returnDate: string | null;
   tripDays: number | null;
@@ -224,6 +226,8 @@ export const listObservationsForAnalytics = async (
     .select({
       priceEurCents: priceSnapshots.priceEurCents,
       observedAt: priceSnapshots.observedAt,
+      origin: flightOffers.origin,
+      destination: flightOffers.destination,
       outboundDate: flightOffers.outboundDate,
       returnDate: flightOffers.returnDate,
       tripDays: flightOffers.tripDays,
@@ -239,6 +243,8 @@ export const listObservationsForAnalytics = async (
   return rows.map((r) => ({
     priceEurCents: r.priceEurCents ?? 0,
     observedAt: r.observedAt,
+    origin: r.origin,
+    destination: r.destination,
     outboundDate: r.outboundDate,
     returnDate: r.returnDate,
     tripDays: r.tripDays,
