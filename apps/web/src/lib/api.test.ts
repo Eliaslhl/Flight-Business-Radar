@@ -75,6 +75,17 @@ describe("api client", () => {
     expect(fn).toHaveBeenCalledWith("/api/notifications/channels", expect.any(Object));
   });
 
+  it("GET recommendations et radarDestinations tapent les bonnes routes", async () => {
+    const rec = mockFetch({ opportunity: { score: 72, band: "GOOD" }, dates: [], radar: null });
+    await api.recommendations("s1");
+    expect(rec).toHaveBeenCalledWith("/api/searches/s1/recommendations", expect.any(Object));
+
+    const radar = mockFetch({ origin: "CDG", count: 2, destinations: [] });
+    const res = await api.radarDestinations();
+    expect(res.origin).toBe("CDG");
+    expect(radar).toHaveBeenCalledWith("/api/radar/destinations", expect.any(Object));
+  });
+
   it("listAlerts passe le filtre searchId", async () => {
     const fn = mockFetch({ alerts: [] });
     await api.listAlerts("s1");

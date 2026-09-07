@@ -69,7 +69,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
         <Field label="Départ (IATA)">
           <Input value={form.origin} onChange={set("origin")} maxLength={3} />
         </Field>
-        <Field label="Destinations (IATA, séparées par des virgules)">
+        <Field label="Destinations (IATA, séparées par des virgules — vide = mode Radar)">
           <Input value={form.destinations} onChange={set("destinations")} placeholder="HND, ICN" />
         </Field>
         <Field label="Classe">

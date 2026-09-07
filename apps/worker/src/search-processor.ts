@@ -14,7 +14,13 @@ import {
   type SearchDateCombinationRow,
   type SearchRow,
 } from "@fbr/database";
-import { daysBetween, isoDate, offerMaxStops, type FlightOffer } from "@fbr/flight-domain";
+import {
+  daysBetween,
+  isoDate,
+  offerMaxStops,
+  radarDestinationSlice,
+  type FlightOffer,
+} from "@fbr/flight-domain";
 import { type ProviderRegistry } from "@fbr/flight-providers";
 import { type NotificationService } from "@fbr/notifications";
 import { normalizeSearchResults } from "@fbr/normalizer";
@@ -39,6 +45,11 @@ export interface SearchProcessorDeps {
   readonly logger: Logger;
   readonly combinationsPerRun: number;
   readonly providerMinIntervalSeconds: number;
+  /**
+   * Mode Radar : nombre de destinations de la liste seed sondées par run
+   * (tranche rotative). Défaut 8.
+   */
+  readonly radarBatchSize?: number;
   /** Seuils de détection de baisse (config). */
   readonly thresholds: DropThresholds;
   /** Conversion vers la devise de référence (centimes) — injectée par le worker. */
@@ -194,6 +205,21 @@ export const processSearchRun = async (
   }
 
   const searchLike = toSearchLike(search);
+  const radar = searchLike.destinations.length === 0;
+  // Mode Radar : un seul couple de dates représentatif, mais éclaté sur une
+  // tranche rotative de la liste seed (change toutes les 10 min → couverture
+  // complète en quelques runs).
+  const combosToRun = radar ? picked.slice(0, 1) : picked;
+  const radarSlice = radar
+    ? radarDestinationSlice(Math.floor(runAt.getTime() / 600_000), deps.radarBatchSize ?? 8)
+    : null;
+  if (radarSlice) {
+    deps.logger.info(
+      { event: "radar_fanout", searchId: search.id, destinations: radarSlice },
+      "mode Radar : sondage d'une tranche de destinations",
+    );
+  }
+
   const allSnapshots: InsertSnapshotInput[] = [];
   const providerRequestRows: ProviderRequestInput[] = [];
   const offersById = new Map<string, FlightOffer>();
@@ -201,8 +227,10 @@ export const processSearchRun = async (
   let providerErrors = 0;
   let bestPriceCents: number | null = null;
 
-  for (const combo of picked) {
-    const request = buildRequestForCombination(searchLike, combo);
+  for (const combo of combosToRun) {
+    const request = radarSlice
+      ? buildRequestForCombination(searchLike, combo, { destinations: radarSlice })
+      : buildRequestForCombination(searchLike, combo);
     const { offers, outcomes } = await deps.registry.searchAll(request);
     providerErrors += outcomes.filter((o) => !o.ok).length;
     for (const outcome of outcomes) {

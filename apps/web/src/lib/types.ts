@@ -158,6 +158,57 @@ export interface NotificationChannelsStatus {
   maxAttempts: number;
 }
 
+export type OpportunityBand = "EXCEPTIONAL" | "GOOD" | "FAIR" | "POOR" | "INSUFFICIENT_DATA";
+
+export interface OpportunityScore {
+  score: number | null;
+  band: OpportunityBand;
+  reasons: string[];
+  factors: {
+    pricePts: number;
+    trendPts: number;
+    urgencyPts: number;
+    targetPts: number;
+    priceVsMedianPct: number;
+  } | null;
+}
+
+export interface DateRecommendation {
+  outboundDate: string;
+  returnDate: string | null;
+  tripDays: number | null;
+  latestPriceEurCents: number;
+  minPriceEurCents: number;
+  sampleSize: number;
+  reliable: boolean;
+  deltaVsMedianPct: number;
+}
+
+export interface RadarDestinationRank {
+  destination: string;
+  latestPriceEurCents: number;
+  minPriceEurCents: number;
+  bestOutboundDate: string;
+  sampleSize: number;
+  reliable: boolean;
+}
+
+export interface RecommendationReport {
+  currency: "EUR";
+  generatedAt: string;
+  sampleSize: number;
+  opportunity: OpportunityScore;
+  dates: DateRecommendation[];
+  radar: RadarDestinationRank[] | null;
+}
+
+export interface SeedAirport {
+  iata: string;
+  city: string;
+  country: string;
+  region: string;
+}
+
 export interface CreateSearchInput {
   label?: string;
   origin: string;

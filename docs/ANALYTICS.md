@@ -63,6 +63,7 @@ Worker `processSearchRun` → écrit les `price_snapshots` (avec `price_eur_cent
 
 - `GET /api/searches/:id/analytics` → `buildAnalyticsReport` sur toutes les observations `price_eur_cents` de la recherche.
 - `GET /api/searches/:id/events?limit=200` → `price_events` (le plus récent d'abord).
+- `GET /api/searches/:id/recommendations` → `buildRecommendationReport` (score d'opportunité + top dates + classement Radar). Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md).
 
 ## Configuration (`.env`)
 

@@ -112,6 +112,7 @@ describe("loadConfig", () => {
       searchWorkerConcurrency: 4,
       combinationsPerRun: 6,
       providerMinIntervalSeconds: 60,
+      radarBatchSize: 8,
       mockScenario: "normal",
     });
   });

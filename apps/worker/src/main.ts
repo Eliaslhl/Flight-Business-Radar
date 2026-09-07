@@ -31,6 +31,7 @@ const processorDeps: SearchProcessorDeps = {
   logger,
   combinationsPerRun: config.engine.combinationsPerRun,
   providerMinIntervalSeconds: config.engine.providerMinIntervalSeconds,
+  radarBatchSize: config.engine.radarBatchSize,
   thresholds: {
     ...DEFAULT_DROP_THRESHOLDS,
     priceDropPct: config.detection.dropPct,

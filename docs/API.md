@@ -69,6 +69,20 @@ Historique brut des snapshots (append-only), le plus récent d'abord :
 `{ currency: "EUR", sampleSize, reliable, summary, trend, best, latest, byMonth[], byDayOfWeek[], byTripDuration[], byAirline[], byStops[], bestMonth }`.
 Chaque groupe porte `reliable` (échantillon suffisant ou non). Voir [`ANALYTICS.md`](ANALYTICS.md).
 
+### `GET /api/searches/:id/recommendations` → `RecommendationReport`
+
+`{ currency: "EUR", generatedAt, sampleSize, opportunity, dates[], radar[] | null }` (Phase 9) :
+
+- `opportunity` : `{ score: 0-100 | null, band: EXCEPTIONAL|GOOD|FAIR|POOR|INSUFFICIENT_DATA, reasons: string[], factors }` — `null`/`INSUFFICIENT_DATA` sous `ANALYTICS_MIN_SAMPLE` observations.
+- `dates` : top-3 couples `{ outboundDate, returnDate, tripDays, latestPriceEurCents, minPriceEurCents, sampleSize, reliable, deltaVsMedianPct }`.
+- `radar` : classement des destinations `{ destination, latestPriceEurCents, minPriceEurCents, bestOutboundDate, sampleSize, reliable }` — `null` hors mode Radar.
+
+Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md). `404` si la recherche est inconnue.
+
+### `GET /api/radar/destinations` → `{ origin: "CDG", count, destinations }`
+
+Liste seed statique des destinations long-courrier CDG (`{ iata, city, country, region }[]`) — sert à libeller le mode Radar. Aucun secret, aucune dépendance DB.
+
 ### `GET /api/searches/:id/events?limit=200` → `{ events: [...] }`
 
 `price_events` dérivés, le plus récent d'abord :

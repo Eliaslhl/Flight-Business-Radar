@@ -53,6 +53,16 @@ describe("buildRequestForCombination", () => {
     expect(req.maxPrice).toBeUndefined();
     expect(req.targetPrice).toBeUndefined();
   });
+
+  it("remplace les destinations via l'option (fan-out Radar)", () => {
+    const radar: SearchLike = { ...search, destinations: [] };
+    const req = buildRequestForCombination(
+      radar,
+      { outboundDate: "2026-11-10", returnDate: "2026-11-20", tripDays: 10 },
+      { destinations: ["JFK", "DXB", "SIN"] },
+    );
+    expect(req.destinations).toEqual(["JFK", "DXB", "SIN"]);
+  });
 });
 
 describe("buildWindowRequest", () => {

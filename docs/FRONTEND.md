@@ -17,16 +17,18 @@ donc nécessaire côté API.
 
 ## Pages
 
-| Route            | Contenu                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                         |
-| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                 |
-| `/searches/[id]` | Résumé analytics, **graphique prix/temps**, prix moyen par mois, événements, alertes, notifications, vols observés  |
-| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                               |
-| `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev) |
+| Route            | Contenu                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                                                                                                      |
+| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                                                                                              |
+| `/searches/[id]` | Résumé analytics, **carte Recommandations** (score d'opportunité + top-3 dates + classement Radar), graphique prix/temps, prix moyen par mois, événements, alertes, notifications, vols observés |
+| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                                                                                                            |
+| `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev)                                                                              |
 
-`/destinations` et une vue globale des vols sont reportées : le mode Radar est Phase 9 et
-l'API n'expose pas d'agrégat inter-recherches.
+Le **mode Radar** (recherche sans destination) est disponible : le formulaire de création
+accepte une liste de destinations vide, et le détail d'une recherche Radar affiche le
+**classement des destinations** dans la carte Recommandations (Phase 9). Une vue
+« exploration » dédiée (page `/radar` avec la liste seed complète) reste à faire.
 
 ## Organisation
 

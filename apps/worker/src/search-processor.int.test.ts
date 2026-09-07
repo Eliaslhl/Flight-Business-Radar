@@ -5,6 +5,7 @@ import {
   createSearch,
   getSearch,
   listNotificationsForSearch,
+  listObservationsForAnalytics,
   listPriceEventsForSearch,
   listProviderRequests,
   listSnapshotsForSearch,
@@ -119,6 +120,32 @@ suite("processSearchRun (intégration Postgres)", () => {
     expect(fresh?.lastRunAt).not.toBeNull();
     expect(fresh?.nextRunAt.getTime()).toBeGreaterThan(Date.now());
     expect(["HIGH", "MEDIUM", "LOW"]).toContain(fresh?.priority);
+  });
+
+  it("mode Radar : éclate un couple de dates sur une tranche de destinations seed", async () => {
+    const search = await createSearch(handle.db, {
+      origin: "CDG",
+      destinations: [], // ⇒ Radar
+      cabinClass: "BUSINESS",
+      departureWindowStart: "2026-11-01",
+      departureWindowEnd: "2026-11-30",
+      minTripDays: 10,
+      maxTripDays: 12,
+      currency: "EUR",
+    });
+    const registry = new ProviderRegistry([
+      new MockFlightProvider({ name: "mock", scenario: "normal", basePriceEur: 1400 }),
+    ]);
+
+    await processSearchRun(deps(registry, 6, { radarBatchSize: 5 }), {
+      searchId: search.id,
+      reason: "manual",
+    });
+
+    const obs = await listObservationsForAnalytics(handle.db, search.id);
+    const destinations = new Set(obs.map((o) => o.destination));
+    expect(destinations.size).toBe(5); // la tranche seed sondée
+    expect(obs.every((o) => o.origin === "CDG")).toBe(true);
   });
 
   it("est append-only : chaque run ajoute des snapshots sans écraser les précédents", async () => {

@@ -18,6 +18,7 @@ import {
   relativeTime,
 } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
+import type { OpportunityBand, RecommendationReport } from "@/lib/types";
 
 export default function SearchDetailPage() {
   const id = String(useParams().id);
@@ -27,6 +28,10 @@ export default function SearchDetailPage() {
   const flights = useQuery({ queryKey: qk.flights(id), queryFn: () => api.flights(id) });
   const prices = useQuery({ queryKey: qk.prices(id), queryFn: () => api.prices(id) });
   const analytics = useQuery({ queryKey: qk.analytics(id), queryFn: () => api.analytics(id) });
+  const recommendations = useQuery({
+    queryKey: qk.recommendations(id),
+    queryFn: () => api.recommendations(id),
+  });
   const events = useQuery({ queryKey: qk.events(id), queryFn: () => api.events(id) });
   const notifications = useQuery({
     queryKey: qk.notifications(id),
@@ -41,6 +46,7 @@ export default function SearchDetailPage() {
         qk.flights(id),
         qk.prices(id),
         qk.analytics(id),
+        qk.recommendations(id),
         qk.events(id),
         qk.notifications(id),
       ]) {
@@ -110,6 +116,17 @@ export default function SearchDetailPage() {
           }
         />
       </div>
+
+      <Card>
+        <CardTitle>Recommandations</CardTitle>
+        {recommendations.isLoading ? (
+          <Spinner />
+        ) : recommendations.isError ? (
+          <ErrorState error={recommendations.error} />
+        ) : (
+          <RecommendationsBody data={recommendations.data} />
+        )}
+      </Card>
 
       <Card>
         <CardTitle>Prix dans le temps</CardTitle>
@@ -257,5 +274,90 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       <div className="mt-1 text-xl font-semibold">{value}</div>
       {hint ? <div className="text-xs text-[var(--color-warn)]">{hint}</div> : null}
     </Card>
+  );
+}
+
+const OPPORTUNITY_META: Record<
+  OpportunityBand,
+  { label: string; tone: "ok" | "accent" | "warn" | "neutral" }
+> = {
+  EXCEPTIONAL: { label: "Exceptionnel", tone: "ok" },
+  GOOD: { label: "Bon moment", tone: "accent" },
+  FAIR: { label: "Correct", tone: "warn" },
+  POOR: { label: "Peu favorable", tone: "neutral" },
+  INSUFFICIENT_DATA: { label: "Données insuffisantes", tone: "neutral" },
+};
+
+function RecommendationsBody({ data }: { data: RecommendationReport | undefined }) {
+  if (!data) return <EmptyState>Pas encore de recommandation.</EmptyState>;
+  const meta = OPPORTUNITY_META[data.opportunity.band];
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={meta.tone}>{meta.label}</Badge>
+        {data.opportunity.score !== null ? (
+          <span className="text-lg font-semibold">{data.opportunity.score}/100</span>
+        ) : null}
+        <span className="text-xs text-[var(--color-muted)]">
+          score d&apos;opportunité · {data.sampleSize} observations
+        </span>
+      </div>
+      {data.opportunity.reasons.length > 0 ? (
+        <ul className="list-disc space-y-0.5 pl-5 text-[var(--color-muted)]">
+          {data.opportunity.reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {data.dates.length > 0 ? (
+        <div>
+          <div className="mb-1 font-medium">Meilleures dates</div>
+          <ul className="divide-y divide-[var(--color-border)]">
+            {data.dates.map((d) => (
+              <li
+                key={`${d.outboundDate}-${d.returnDate ?? ""}`}
+                className="flex items-center justify-between gap-2 py-1.5"
+              >
+                <span>
+                  {formatDate(d.outboundDate, true)}
+                  {d.returnDate ? ` → ${formatDate(d.returnDate, true)}` : ""}
+                  {d.reliable ? "" : " ·  peu de données"}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium">{formatEur(d.latestPriceEurCents)}</span>
+                  <span className="text-xs text-[var(--color-muted)]">
+                    {formatPct(d.deltaVsMedianPct)} vs médiane
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {data.radar && data.radar.length > 0 ? (
+        <div>
+          <div className="mb-1 font-medium">Classement destinations (Radar)</div>
+          <ul className="divide-y divide-[var(--color-border)]">
+            {data.radar.map((r) => (
+              <li key={r.destination} className="flex items-center justify-between gap-2 py-1.5">
+                <span>
+                  <strong>{r.destination}</strong> · meilleure date{" "}
+                  {formatDate(r.bestOutboundDate, true)}
+                  {r.reliable ? "" : " ·  peu de données"}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium">{formatEur(r.latestPriceEurCents)}</span>
+                  <span className="text-xs text-[var(--color-muted)]">
+                    min {formatEur(r.minPriceEurCents)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
