@@ -1,7 +1,9 @@
 import {
+  addDays,
   compareIsoDate,
   daysBetween,
   flightOfferSchema,
+  isoDate,
   isRadarSearch,
   offerMaxStops,
   type FlightOffer,
@@ -37,6 +39,12 @@ export interface ValidateOptions {
   readonly requireCabinMatch?: boolean;
   /** Exiger que la devise de l'offre corresponde à `request.currency`. Défaut : true. */
   readonly requireCurrencyMatch?: boolean;
+  /**
+   * Tolérance en jours sur les dates : le départ est accepté à ± cette valeur
+   * de la fenêtre, et la durée de séjour à ± 2× cette valeur (chaque extrémité
+   * peut bouger de ± `dateToleranceDays`). Défaut : 0 (dates strictes).
+   */
+  readonly dateToleranceDays?: number;
 }
 
 const DEFAULT_BAND = { min: 400_00, max: 30_000_00 } as const;
@@ -58,6 +66,7 @@ export const validateOffer = (
   const band = options.priceBandCents ?? DEFAULT_BAND;
   const requireCabinMatch = options.requireCabinMatch ?? true;
   const requireCurrencyMatch = options.requireCurrencyMatch ?? true;
+  const dateTolerance = Math.max(0, Math.trunc(options.dateToleranceDays ?? 0));
 
   const reject = (reason: RejectionReason, detail: string): Result<FlightOffer, RejectedOffer> =>
     err({ offer, reason, detail });
@@ -95,7 +104,7 @@ export const validateOffer = (
   }
 
   // 5. Cohérence des dates.
-  const dateError = checkDates(offer, request);
+  const dateError = checkDates(offer, request, dateTolerance);
   if (dateError) return reject("DATE_INCOHERENT", dateError);
 
   // 6. Escales.
@@ -126,11 +135,17 @@ export const validateOffer = (
   return ok(offer);
 };
 
-const checkDates = (offer: FlightOffer, request: FlightSearchRequest): string | null => {
+const checkDates = (
+  offer: FlightOffer,
+  request: FlightSearchRequest,
+  toleranceDays = 0,
+): string | null => {
   const { start, end } = request.departureWindow;
+  const lo = toleranceDays > 0 ? addDays(isoDate(start), -toleranceDays) : start;
+  const hi = toleranceDays > 0 ? addDays(isoDate(end), toleranceDays) : end;
   const out = offer.outbound.departureDate;
-  if (compareIsoDate(out, start) < 0 || compareIsoDate(out, end) > 0) {
-    return `départ ${out} hors fenêtre [${start}, ${end}]`;
+  if (compareIsoDate(out, lo) < 0 || compareIsoDate(out, hi) > 0) {
+    return `départ ${out} hors fenêtre [${lo}, ${hi}]`;
   }
 
   for (const leg of [offer.outbound, offer.inbound]) {
@@ -145,7 +160,9 @@ const checkDates = (offer: FlightOffer, request: FlightSearchRequest): string | 
   if (offer.inbound) {
     const tripDays = daysBetween(offer.outbound.departureDate, offer.inbound.departureDate);
     if (tripDays < 0) return `retour avant l'aller (${String(tripDays)}j)`;
-    const { minDays, maxDays } = request.tripDuration;
+    // Chaque extrémité peut bouger de ± toleranceDays ⇒ la durée varie de ± 2×.
+    const minDays = Math.max(1, request.tripDuration.minDays - 2 * toleranceDays);
+    const maxDays = request.tripDuration.maxDays + 2 * toleranceDays;
     if (tripDays < minDays || tripDays > maxDays) {
       return `durée de séjour ${String(tripDays)}j hors [${String(minDays)}, ${String(maxDays)}]`;
     }

@@ -1,4 +1,5 @@
 import { type AppConfig } from "@fbr/config";
+import { DATE_FLEX_DAYS } from "@fbr/flight-domain";
 import {
   DuffelFlightProvider,
   FastFlightsProvider,
@@ -29,6 +30,7 @@ export const buildProviderRegistry = (config: AppConfig, logger: Logger): Provid
         apiKey: config.providers.serpapi.apiKey,
         timeoutMs: config.providers.serpapi.timeoutMs,
         maxDestinations: config.providers.serpapi.maxDestinations,
+        dateFlexDays: DATE_FLEX_DAYS,
         logger,
       }),
     );

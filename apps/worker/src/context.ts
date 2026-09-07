@@ -29,8 +29,9 @@ export const buildProcessorContext = (config: AppConfig, logger: Logger): Proces
   const notificationService = buildNotificationService(config, logger);
 
   // Plancher d'intervalle de sondage, selon la source réelle :
-  // - SerpApi actif (payant, 1 appel = 1 crédit, 3 cabines/passage) → 6 h, pour
-  //   tenir le budget mensuel ; les combos sont aussi ramenés à 1 (voir plus bas).
+  // - SerpApi actif (payant, 1 appel = 1 crédit ; 3 cabines × 3 dates ±1 j =
+  //   9 crédits/passage) → 12 h, pour tenir le budget mensuel ; les combos sont
+  //   aussi ramenés à 1 (voir plus bas).
   // - Travelpayouts seul (cache ~48 h) → 3 h, sonder plus vite ne sert à rien.
   const serpapiActive = config.providers.serpapi !== null;
   const onlyCachedSource =
@@ -38,7 +39,7 @@ export const buildProcessorContext = (config: AppConfig, logger: Logger): Proces
     config.providers.travelpayouts !== null &&
     config.providers.fastFlights === null;
   const providerMinIntervalSeconds = serpapiActive
-    ? Math.max(config.engine.providerMinIntervalSeconds, 21_600)
+    ? Math.max(config.engine.providerMinIntervalSeconds, 43_200)
     : onlyCachedSource
       ? Math.max(config.engine.providerMinIntervalSeconds, 10_800)
       : config.engine.providerMinIntervalSeconds;

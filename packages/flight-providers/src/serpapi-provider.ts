@@ -24,6 +24,12 @@ export interface SerpApiProviderOptions {
   readonly maxDestinations?: number;
   /** `deep_search=true` : prix plus fidèles à Google Flights, réponse plus lente. */
   readonly deepSearch?: boolean;
+  /**
+   * Sonde aussi le départ à ± N jours (retour décalé d'autant, durée du séjour
+   * conservée) si un tarif y est meilleur. 0 = uniquement les dates saisies.
+   * Chaque jour supplémentaire multiplie le coût (1 crédit par date × cabine).
+   */
+  readonly dateFlexDays?: number;
   readonly fetchImpl?: FetchLike;
   readonly now?: () => string;
   readonly logger?: { debug: (obj: unknown, msg: string) => void };
@@ -87,6 +93,7 @@ export class SerpApiFlightProvider implements FlightProvider {
   private readonly apiKey: string;
   private readonly timeoutMs: number;
   private readonly deepSearch: boolean;
+  private readonly dateFlexDays: number;
   private readonly fetchImpl: FetchLike;
   private readonly now: () => string;
   private readonly logger: SerpApiProviderOptions["logger"];
@@ -96,6 +103,7 @@ export class SerpApiFlightProvider implements FlightProvider {
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 20_000;
     this.deepSearch = options.deepSearch ?? false;
+    this.dateFlexDays = Math.max(0, Math.trunc(options.dateFlexDays ?? 0));
     this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init));
     this.now = options.now ?? ((): string => new Date().toISOString());
     this.logger = options.logger;
@@ -114,16 +122,29 @@ export class SerpApiFlightProvider implements FlightProvider {
     }
     const destination = request.destinations[0]!;
 
-    const outboundDate = request.departureWindow.start;
-    const returnDate = addDays(isoDate(outboundDate), request.tripDuration.minDays);
+    const nights = request.tripDuration.minDays;
+    const base = isoDate(request.departureWindow.start);
+    const today = this.now().slice(0, 10);
+    // Départ saisi + ± `dateFlexDays` jours (retour décalé d'autant : durée du
+    // séjour conservée). On ignore les dates déjà passées.
+    const departures: string[] = [];
+    for (let d = -this.dateFlexDays; d <= this.dateFlexDays; d += 1) {
+      const dep = addDays(base, d);
+      if (dep >= today) departures.push(dep);
+    }
+    if (departures.length === 0) departures.push(base);
 
-    // 1 appel par cabine → on renvoie tout, l'analyse gardera les 3 moins chers.
-    const perCabin = await Promise.all(
-      CABINS_QUERIED.map((cabin) =>
-        this.searchOne(request, destination, outboundDate, returnDate, cabin),
-      ),
+    // 1 appel par (date de départ × cabine) → on renvoie tout, l'analyse gardera
+    // les 3 moins chers.
+    const perQuery = await Promise.all(
+      departures.flatMap((outboundDate) => {
+        const returnDate = addDays(isoDate(outboundDate), nights);
+        return CABINS_QUERIED.map((cabin) =>
+          this.searchOne(request, destination, outboundDate, returnDate, cabin),
+        );
+      }),
     );
-    return perCabin.flat();
+    return perQuery.flat();
   }
 
   private async searchOne(

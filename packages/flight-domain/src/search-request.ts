@@ -5,6 +5,14 @@ import { compareIsoDate, isoDateSchema } from "./dates.js";
 import { moneySchema } from "./money.js";
 
 /**
+ * Tolérance de dates (jours) : une recherche définit un aller + un retour
+ * exacts, mais on accepte / on sonde aussi 1 jour avant et 1 jour après sur
+ * chaque extrémité si le tarif y est meilleur. 0 = strictement les dates
+ * saisies. Voir `checkDates` (normalizer) et l'expansion de requête SerpApi.
+ */
+export const DATE_FLEX_DAYS = 1;
+
+/**
  * Recherche exprimée par l'utilisateur. `destinations` vide ⇒ mode Radar/Explore
  * (le moteur choisit les destinations). Les dates sont une **fenêtre** de départ ;
  * la génération des couples aller/retour se fait en Phase 3.
