@@ -61,4 +61,13 @@ describe("api /health", () => {
     expect(body.count).toBeGreaterThanOrEqual(40);
     expect(body.destinations.every((d) => /^[A-Z]{3}$/.test(d.iata))).toBe(true);
   });
+
+  it("GET /api/airports expose le référentiel d'autocomplétion", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/airports" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ count: number; airports: { iata: string; city: string }[] }>();
+    expect(body.count).toBe(body.airports.length);
+    expect(body.count).toBeGreaterThan(100);
+    expect(body.airports.some((a) => a.iata === "CDG" && a.city.includes("Paris"))).toBe(true);
+  });
 });

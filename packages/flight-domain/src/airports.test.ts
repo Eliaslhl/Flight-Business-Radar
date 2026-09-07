@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CDG_LONGHAUL_DESTINATIONS,
   SEED_DESTINATION_CODES,
+  WORLD_AIRPORTS,
+  findAirport,
   findSeedAirport,
   isSeedDestination,
   radarDestinationSlice,
@@ -38,5 +40,24 @@ describe("seed des destinations CDG long-courrier", () => {
       radarDestinationSlice(SEED_DESTINATION_CODES.length - 1, 3),
     );
     expect(radarDestinationSlice(0, 999)).toEqual([...SEED_DESTINATION_CODES]);
+  });
+});
+
+describe("référentiel WORLD_AIRPORTS (autocomplétion)", () => {
+  it("codes IATA valides et uniques, inclut CDG et les destinations seed", () => {
+    const codes = WORLD_AIRPORTS.map((a) => a.iata);
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const a of WORLD_AIRPORTS) {
+      expect(a.iata).toMatch(/^[A-Z]{3}$/);
+      expect(a.city.length).toBeGreaterThan(0);
+      expect(a.country.length).toBeGreaterThan(0);
+    }
+    expect(codes).toContain("CDG");
+    for (const seed of SEED_DESTINATION_CODES) expect(codes).toContain(seed);
+  });
+
+  it("findAirport est insensible à la casse", () => {
+    expect(findAirport("cdg")).toEqual({ iata: "CDG", city: "Paris", country: "France" });
+    expect(findAirport("XXX")).toBeUndefined();
   });
 });

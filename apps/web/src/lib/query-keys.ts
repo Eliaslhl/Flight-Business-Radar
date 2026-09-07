@@ -2,6 +2,7 @@ export const qk = {
   health: ["health"] as const,
   notificationChannels: ["notification-channels"] as const,
   radarDestinations: ["radar-destinations"] as const,
+  airports: ["airports"] as const,
   searches: ["searches"] as const,
   search: (id: string) => ["searches", id] as const,
   flights: (id: string) => ["searches", id, "flights"] as const,

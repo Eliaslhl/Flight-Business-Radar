@@ -9,6 +9,7 @@ import type {
   NotificationChannelsStatus,
   RecommendationReport,
   SeedAirport,
+  WorldAirport,
   PriceEvent,
   PriceSnapshot,
   Search,
@@ -80,6 +81,8 @@ export const api = {
     request<{ origin: string; count: number; destinations: SeedAirport[] }>(
       "/api/radar/destinations",
     ),
+  airports: () =>
+    request<{ count: number; airports: WorldAirport[] }>("/api/airports").then((r) => r.airports),
   events: (id: string) =>
     request<{ events: PriceEvent[] }>(`/api/searches/${id}/events`).then((r) => r.events),
   notifications: (id: string) =>

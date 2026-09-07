@@ -83,6 +83,10 @@ Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md). `404` si la recherche est incon
 
 Liste seed statique des destinations long-courrier CDG (`{ iata, city, country, region }[]`) — sert à libeller le mode Radar. Aucun secret, aucune dépendance DB.
 
+### `GET /api/airports` → `{ count, airports }`
+
+Référentiel curé (~170 aéroports `{ iata, city, country }`) pour l'autocomplétion des champs origine / destination du dashboard. Statique, aucun secret, aucune DB.
+
 ### `GET /api/searches/:id/advice` → `Advice`
 
 Conseil en langage naturel (Phase 10) : `{ text, action, verdict, flagged[], fallback, model, facts, generatedAt }`.
