@@ -19,9 +19,18 @@ import {
 import {
   buildAnalyticsReport,
   buildRecommendationReport,
+  type AnalyticsReport,
   type PriceObservation,
   type RecommendationObservation,
+  type RecommendationReport,
 } from "@fbr/analytics";
+import {
+  AnthropicLlmClient,
+  MockLlmClient,
+  buildAdvisorInput,
+  generateAdvice,
+  type LlmClient,
+} from "@fbr/advisor";
 import { enqueueSearchRun, type Queue, type SearchRunJobData } from "@fbr/queue";
 import { generateDateCombinations } from "@fbr/search-engine";
 import { type Logger } from "@fbr/shared";
@@ -33,6 +42,15 @@ export interface SearchRoutesDeps {
   readonly queue?: Queue<SearchRunJobData>;
   readonly logger: Logger;
   readonly analyticsMinSample: number;
+  /** Config Anthropic — si absente, l'advisor utilise le générateur `rules`. */
+  readonly advisor?: {
+    readonly anthropic: {
+      readonly apiKey: string;
+      readonly model: string;
+      readonly maxTokens: number;
+      readonly timeoutMs: number;
+    } | null;
+  };
 }
 
 const toDto = (row: SearchRow) => ({
@@ -218,12 +236,20 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
     });
   });
 
-  app.get("/api/searches/:id/recommendations", async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
-    const rows = await listObservationsForAnalytics(db, id);
-    const observations: RecommendationObservation[] = rows.map((o) => ({
+  const buildReports = async (
+    row: SearchRow,
+  ): Promise<{ analytics: AnalyticsReport; recommendation: RecommendationReport }> => {
+    const rows = await listObservationsForAnalytics(db, row.id);
+    const analyticsObs: PriceObservation[] = rows.map((o) => ({
+      priceEurCents: o.priceEurCents,
+      observedAt: o.observedAt.toISOString(),
+      outboundDate: o.outboundDate,
+      returnDate: o.returnDate,
+      tripDays: o.tripDays,
+      marketingAirline: o.marketingAirline,
+      maxStops: o.maxStops,
+    }));
+    const recObs: RecommendationObservation[] = rows.map((o) => ({
       priceEurCents: o.priceEurCents,
       observedAt: o.observedAt.toISOString(),
       outboundDate: o.outboundDate,
@@ -231,13 +257,41 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
       tripDays: o.tripDays,
       destination: o.destination,
     }));
-    return buildRecommendationReport(observations, {
-      departureWindowStart: row.departureWindowStart,
-      targetEurCents: row.targetPriceCents,
-      maxEurCents: row.maxPriceCents,
-      minSampleSize: deps.analyticsMinSample,
-      radar: row.destinations.length === 0,
-    });
+    return {
+      analytics: buildAnalyticsReport(analyticsObs, {
+        minSampleSize: deps.analyticsMinSample,
+        overallMinSampleSize: deps.analyticsMinSample,
+      }),
+      recommendation: buildRecommendationReport(recObs, {
+        departureWindowStart: row.departureWindowStart,
+        targetEurCents: row.targetPriceCents,
+        maxEurCents: row.maxPriceCents,
+        minSampleSize: deps.analyticsMinSample,
+        radar: row.destinations.length === 0,
+      }),
+    };
+  };
+
+  app.get("/api/searches/:id/recommendations", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    return (await buildReports(row)).recommendation;
+  });
+
+  app.get("/api/searches/:id/advice", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getSearch(db, id);
+    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+
+    const { analytics, recommendation } = await buildReports(row);
+    const facts = buildAdvisorInput({ search: row, analytics, recommendation });
+
+    const anthropic = deps.advisor?.anthropic ?? null;
+    const llm: LlmClient = anthropic ? new AnthropicLlmClient(anthropic) : new MockLlmClient();
+
+    const advice = await generateAdvice(facts, { llm, logger: deps.logger });
+    return { ...advice, facts, generatedAt: new Date().toISOString() };
   });
 
   app.get("/api/searches/:id/notifications", async (request, reply) => {

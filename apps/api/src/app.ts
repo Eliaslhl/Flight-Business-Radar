@@ -68,6 +68,7 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
       ...(queue ? { queue } : {}),
       logger,
       analyticsMinSample: config.detection.analyticsMinSample,
+      advisor: { anthropic: config.advisor.anthropic },
     });
     registerAlertRoutes(app, { db: db.db });
   }

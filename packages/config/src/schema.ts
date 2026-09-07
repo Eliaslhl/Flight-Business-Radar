@@ -112,6 +112,13 @@ export const configSchema = z
     NOTIFICATION_WEBHOOK_URL: z.string().url().optional(),
     NOTIFICATION_TIMEOUT_MS: posInt.default(10_000),
     NOTIFICATION_MAX_ATTEMPTS: posInt.max(10).default(3),
+
+    // AI Advisor (Phase 10) — sans clé, l'advisor utilise le générateur
+    // déterministe (`rules`). Aucun secret en dur.
+    ANTHROPIC_API_KEY: optionalSecret,
+    ADVISOR_MODEL: z.string().trim().min(1).default("claude-sonnet-5"),
+    ADVISOR_MAX_TOKENS: posInt.max(4000).default(600),
+    ADVISOR_TIMEOUT_MS: posInt.default(20_000),
   })
   .transform((raw) => ({
     env: raw.NODE_ENV,
@@ -170,6 +177,17 @@ export const configSchema = z
       webhook: raw.NOTIFICATION_WEBHOOK_URL ? { url: raw.NOTIFICATION_WEBHOOK_URL } : null,
       timeoutMs: raw.NOTIFICATION_TIMEOUT_MS,
       maxAttempts: raw.NOTIFICATION_MAX_ATTEMPTS,
+    },
+    advisor: {
+      anthropic: raw.ANTHROPIC_API_KEY
+        ? {
+            apiKey: raw.ANTHROPIC_API_KEY,
+            model: raw.ADVISOR_MODEL,
+            maxTokens: raw.ADVISOR_MAX_TOKENS,
+            timeoutMs: raw.ADVISOR_TIMEOUT_MS,
+          }
+        : null,
+      model: raw.ADVISOR_MODEL,
     },
   }));
 

@@ -12,6 +12,7 @@
     { "path": "./packages/normalizer/tsconfig.build.json" },
     { "path": "./packages/search-engine/tsconfig.build.json" },
     { "path": "./packages/analytics/tsconfig.build.json" },
+    { "path": "./packages/advisor/tsconfig.build.json" },
     { "path": "./packages/fx/tsconfig.build.json" },
     { "path": "./packages/alerting/tsconfig.build.json" },
     { "path": "./packages/notifications/tsconfig.build.json" },

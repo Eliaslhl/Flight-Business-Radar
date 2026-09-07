@@ -233,6 +233,32 @@ suite("API /api/searches (intégration Postgres)", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("/advice : conseil déterministe (rules) sans clé LLM, COLLECTE sans historique", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({ method: "GET", url: `/api/searches/${id}/advice` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{
+      text: string;
+      action: string;
+      verdict: string;
+      model: string;
+      fallback: boolean;
+      facts: { observations: number };
+    }>();
+    expect(body.model).toBe("rules");
+    expect(body.verdict).toBe("OK");
+    expect(body.action).toBe("COLLECTE");
+    expect(body.facts.observations).toBe(0);
+    expect(body.text.length).toBeGreaterThan(20);
+
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/searches/00000000-0000-0000-0000-0000000000ff/advice",
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it("/recommendations d'une recherche Radar renvoie une section radar (vide au départ)", async () => {
     const created = await app.inject({
       method: "POST",

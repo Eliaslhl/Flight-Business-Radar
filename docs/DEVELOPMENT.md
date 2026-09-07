@@ -22,6 +22,7 @@ pnpm db:migrate
 | Dashboard en dev            | `pnpm --filter @fbr/web dev` → `http://localhost:3000`                                                                                               |
 | Sidecar vols réels (opt.)   | `docker compose --profile scraper up -d flight-scraper` + `FAST_FLIGHTS_URL=http://localhost:8000` dans `.env`                                       |
 | Canaux de notif. en local   | `docker run -p 1025:1025 -p 8025:8025 mailhog/mailhog` (email) ; `NOTIFICATION_WEBHOOK_URL=…` (webhook). Voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md) |
+| Conseil rédigé par Claude   | `ANTHROPIC_API_KEY=…` dans `.env` (sinon générateur `rules` déterministe). Voir [`AI_ADVISOR.md`](AI_ADVISOR.md)                                     |
 | Corriger le formatage       | `pnpm format`                                                                                                                                        |
 | Corriger le lint            | `pnpm lint:fix`                                                                                                                                      |
 

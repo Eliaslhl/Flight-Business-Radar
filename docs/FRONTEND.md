@@ -17,13 +17,13 @@ donc nécessaire côté API.
 
 ## Pages
 
-| Route            | Contenu                                                                                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                                                                                                      |
-| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                                                                                              |
-| `/searches/[id]` | Résumé analytics, **carte Recommandations** (score d'opportunité + top-3 dates + classement Radar), graphique prix/temps, prix moyen par mois, événements, alertes, notifications, vols observés |
-| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                                                                                                            |
-| `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev)                                                                              |
+| Route            | Contenu                                                                                                                                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                                                                                                                                                                                                           |
+| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                                                                                                                                                                                                   |
+| `/searches/[id]` | Résumé analytics, **carte Recommandations** (score d'opportunité + top-3 dates + classement Radar), **carte Conseil** (`/advice` — action + texte FR, badge « réponse recadrée » si le modèle a dérapé), graphique prix/temps, prix moyen par mois, événements, alertes, notifications, vols observés |
+| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                                                                                                                                                                                                                 |
+| `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev)                                                                                                                                                                                   |
 
 Le **mode Radar** (recherche sans destination) est disponible : le formulaire de création
 accepte une liste de destinations vide, et le détail d'une recherche Radar affiche le

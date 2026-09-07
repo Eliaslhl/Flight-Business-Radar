@@ -14,6 +14,7 @@
     "clean": "rimraf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@fbr/advisor": "workspace:*",
     "@fbr/alerting": "workspace:*",
     "@fbr/analytics": "workspace:*",
     "@fbr/config": "workspace:*",
