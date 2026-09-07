@@ -45,6 +45,17 @@ const optionalSecret = z.preprocess(
   (v) => (v === "" ? undefined : v),
   z.string().min(1).optional(),
 );
+/**
+ * Texte optionnel : `""` ou une chaîne d'espaces ⇒ « non défini ». Indispensable
+ * en CI/CD (GitHub Actions, Render…) où un secret absent est injecté comme `""`
+ * plutôt qu'omis.
+ */
+const optionalText = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  z.string().trim().min(1).optional(),
+);
+/** URL optionnelle : `""` ⇒ « non défini » (même raison que `optionalText`). */
+const optionalUrl = z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional());
 
 export const configSchema = z
   .object({
@@ -105,13 +116,13 @@ export const configSchema = z
     // Providers — optionnels tant que non activés (Phase 7+).
     // Sidecar `fast-flights` (services/flight-scraper) : si défini, le worker
     // utilise FastFlightsProvider au lieu du MockFlightProvider.
-    FAST_FLIGHTS_URL: z.string().url().optional(),
+    FAST_FLIGHTS_URL: optionalUrl,
     FAST_FLIGHTS_TIMEOUT_MS: posInt.default(20_000),
     // Travelpayouts Data API — source RÉELLE GRATUITE mais EN CACHE (~48 h),
     // surtout de l'économie. Radar de tendance / meilleur moment, pas de flash drop.
     TRAVELPAYOUTS_TOKEN: optionalSecret,
     /** Marqueur affilié (optionnel) — active les liens de réservation Aviasales. */
-    TRAVELPAYOUTS_MARKER: z.string().trim().min(1).optional(),
+    TRAVELPAYOUTS_MARKER: optionalText,
     TRAVELPAYOUTS_TIMEOUT_MS: posInt.default(20_000),
     TRAVELPAYOUTS_MAX_DESTINATIONS: posInt.max(60).default(8),
     // SerpApi Google Flights (1er provider réel payant — 1 recherche = 1 crédit).
@@ -127,13 +138,13 @@ export const configSchema = z
     // Notifications (Phase 8) — chaque canal s'active quand SA config est
     // complète ; le canal `console` est toujours actif. Aucun secret en dur.
     TELEGRAM_BOT_TOKEN: optionalSecret,
-    TELEGRAM_CHAT_ID: z.string().trim().min(1).optional(),
+    TELEGRAM_CHAT_ID: optionalText,
     /** SMTP unique, ex. `smtp://user:pass@host:587` ou `smtps://…:465`. */
     SMTP_URL: optionalSecret,
-    EMAIL_FROM: z.string().trim().min(1).optional(),
-    EMAIL_TO: z.string().trim().min(1).optional(),
+    EMAIL_FROM: optionalText,
+    EMAIL_TO: optionalText,
     /** Webhook générique (Discord / Slack / ntfy / custom) : POST JSON. */
-    NOTIFICATION_WEBHOOK_URL: z.string().url().optional(),
+    NOTIFICATION_WEBHOOK_URL: optionalUrl,
     NOTIFICATION_TIMEOUT_MS: posInt.default(10_000),
     NOTIFICATION_MAX_ATTEMPTS: posInt.max(10).default(3),
 
