@@ -5,7 +5,7 @@ administrer ; l'option B garde le worker temps réel intact.
 
 | Brique          | Option A — free tiers + cron             | Option B — VM unique           |
 | --------------- | ---------------------------------------- | ------------------------------ |
-| `web` (Next.js) | Vercel Hobby                             | Nginx + `next start` sur la VM |
+| `web` (Next.js) | Render free web service                  | Nginx + `next start` sur la VM |
 | `api` (Fastify) | Render free web service                  | `node apps/api/dist/server.js` |
 | Postgres        | Neon free                                | conteneur `postgres`           |
 | Redis           | — (supprimé)                             | conteneur `redis`              |
@@ -13,66 +13,72 @@ administrer ; l'option B garde le worker temps réel intact.
 | Scraper Python  | non déployé                              | conteneur optionnel            |
 
 > **Secrets** : rien n'est jamais commité. Tous les jetons vivent dans les
-> variables d'environnement de la plateforme (Vercel / Render / _repo secrets_
-> GitHub). `.env.example` est le seul modèle versionné.
+> variables d'environnement de la plateforme (Render / _repo secrets_ GitHub).
+> `.env.example` est le seul modèle versionné.
 
 ---
 
 ## Option A — gratuit, sans serveur à gérer
 
-Architecture : le frontend et l'API sont hébergés sur des free tiers ; le worker
-long-running et Redis sont **remplacés par un cron GitHub Actions** qui exécute
-un passage unique (`@fbr/worker/once`) toutes les 15 min. La source Travelpayouts
-étant en cache (~48 h, plancher d'intervalle 3 h), cette cadence est large.
+Architecture : **Neon** (Postgres) + **Render** (héberge l'API _et_ le front,
+via un blueprint unique) + un **cron GitHub Actions** qui remplace le worker
+long-running et Redis en exécutant un passage unique (`@fbr/worker/once`) toutes
+les 15 min. La source Travelpayouts étant en cache (~48 h, plancher d'intervalle
+3 h), cette cadence est large.
 
 ```
-GitHub Actions (cron */15)          Vercel                Render            Neon
-  └─ node worker/dist/once.js        └─ web (Next.js) ──►  └─ api ──────────► └─ Postgres
-       --migrate                          rewrites /api/*     Fastify   ▲
-       ├─ migrations                                                    │
-       ├─ recherches dues → snapshots / events / alertes ───────────────┘
-       ├─ notifications (Telegram / webhook / e-mail)
-       └─ purge des snapshots > SNAPSHOT_RETENTION_DAYS
+GitHub Actions (cron */15)          Render                              Neon
+  └─ node worker/dist/once.js        ├─ fbr-web  (Next.js) ──rewrites──┐
+       --migrate                     │                     /api/*      ▼
+       ├─ migrations                 └─ fbr-api  (Fastify) ───────────► Postgres
+       ├─ recherches dues → snapshots / events / alertes ──────────────┘  ▲
+       ├─ notifications (Telegram / webhook / e-mail)                     │
+       └─ purge des snapshots > SNAPSHOT_RETENTION_DAYS ─────────────────┘
 ```
 
 ### 1. Base de données — Neon
 
-1. Créer un projet sur [neon.tech](https://neon.tech) (region **EU** de préférence).
-2. Copier la chaîne de connexion **pooled** (`...-pooler...`, `sslmode=require`).
-   C'est le `DATABASE_URL` utilisé partout.
-3. Les migrations sont appliquées automatiquement par le cron (`once --migrate`).
-   Pour les jouer à la main : `DATABASE_URL=... pnpm db:migrate`.
+1. Créer un compte sur [neon.tech](https://neon.tech) (**Sign up with GitHub**).
+2. **Create project** — région proche de Render (ex. _AWS US East (Ohio)_ =
+   `us-east-2`, ou une région EU si tu préfères, mais alors régler Render sur
+   `frankfurt` dans [`render.yaml`](../render.yaml)).
+3. Copier la chaîne **pooled** affichée (elle contient `-pooler` et
+   `sslmode=require`). Retirer `&channel_binding=require` s'il est présent (le
+   driver `postgres.js` ne le négocie pas). C'est le `DATABASE_URL`.
+4. Rien d'autre : les migrations sont jouées par le cron (`once --migrate`).
+   Pour tester à la main : `DATABASE_URL='...' pnpm db:migrate`.
 
-### 2. API — Render
+> ⚠️ Un `DATABASE_URL` contient un mot de passe. Ne jamais le committer ni le
+> coller ailleurs que dans les champs « secret » de Render et GitHub. Si tu l'as
+> exposé, régénère-le : Console Neon → **Roles** → _Reset password_.
 
-Le dépôt contient un blueprint [`render.yaml`](../render.yaml).
+### 2. API + front — Render (un seul blueprint)
 
-1. Sur [render.com](https://render.com) : **New ▸ Blueprint**, pointer sur le repo.
-2. Renseigner les variables marquées `sync: false` : `DATABASE_URL` (Neon),
-   éventuellement `ANTHROPIC_API_KEY`.
-3. Déployer. L'URL publique ressemble à `https://fbr-api.onrender.com`.
-   Vérifier `GET /health` → `{ "status": "ok" }`.
+Le dépôt contient [`render.yaml`](../render.yaml) : il déclare **deux** services
+web gratuits, `fbr-api` et `fbr-web`. `fbr-web` reçoit automatiquement l'URL de
+`fbr-api` (`API_INTERNAL_URL`, via `fromService`) — rien à recopier entre les
+deux.
+
+1. Sur [render.com](https://render.com) : **Sign up with GitHub**.
+2. **New ▸ Blueprint** → sélectionner le dépôt `Flight-Business-Radar`.
+   Render lit `render.yaml` et propose de créer `fbr-api` + `fbr-web`.
+3. Il demande les variables `sync: false` : coller `DATABASE_URL` (Neon) sur
+   `fbr-api`. `ANTHROPIC_API_KEY` est facultatif (laisser vide sinon).
+4. **Apply**. Au bout de ~3-5 min :
+   - `https://fbr-api.onrender.com/health` → `{ "status": "ok" }`
+   - `https://fbr-web.onrender.com` → le dashboard
 
 Notes :
 
-- Plan gratuit ⇒ le service **s'endort après 15 min** sans trafic ; le premier
-  appel ensuite prend ~50 s. Sans impact sur le cron, qui parle direct à Neon.
-- L'API tourne **sans `REDIS_URL`** : `POST /api/searches/:id/run` (enqueue
-  manuel) répond alors `503`. Tout le reste est en lecture et fonctionne.
+- Plan gratuit ⇒ chaque service **s'endort après 15 min** sans trafic ; le
+  premier accès ensuite prend ~50 s (jusqu'à ~100 s si web _et_ api étaient
+  endormis). Sans impact sur le cron, qui parle directement à Neon.
+- L'API tourne **sans `REDIS_URL`** : `POST /api/searches/:id/run` (relance
+  manuelle) répond `503`. Tout le reste fonctionne.
+- Les noms `fbr-api` / `fbr-web` peuvent recevoir un suffixe si déjà pris sur
+  Render ; l'`API_INTERNAL_URL` par `fromService` suit automatiquement.
 
-### 3. Frontend — Vercel
-
-1. **New Project** ▸ importer le repo. _Root Directory_ = `apps/web`.
-   Vercel détecte Next.js et pnpm ; le monorepo est géré automatiquement.
-2. Variable d'environnement : `API_INTERNAL_URL = https://fbr-api.onrender.com`
-   (consommée par les `rewrites` de [`next.config.mjs`](../apps/web/next.config.mjs) —
-   le navigateur ne voit que des chemins `/api/*` relatifs).
-3. Déployer.
-
-> Vercel Hobby est réservé à un usage **non commercial** — OK pour un dashboard
-> perso. Une exploitation commerciale impose un plan payant.
-
-### 4. Surveillance — cron GitHub Actions
+### 3. Surveillance — cron GitHub Actions
 
 Le workflow [`.github/workflows/poll.yml`](../.github/workflows/poll.yml) est déjà
 dans le repo. Il faut juste renseigner les **repo secrets**
@@ -93,9 +99,9 @@ manuel. Un `concurrency.group` empêche deux passages simultanés. Les exécutio
 GitHub Actions sont _best-effort_ (parfois 10-15 min de retard) — sans
 conséquence ici.
 
-### 5. Créer une première recherche
+### 4. Créer une première recherche
 
-Via l'UI (`https://<projet>.vercel.app`) ou l'API :
+Via l'UI (`https://fbr-web.onrender.com`) ou l'API :
 
 ```bash
 curl -X POST https://fbr-api.onrender.com/api/searches \

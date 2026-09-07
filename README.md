@@ -131,9 +131,9 @@ docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDAT
 
 ## Déploiement
 
-Mise en ligne **gratuite** possible : Vercel (web) + Render (api) + Neon
-(Postgres) + un cron GitHub Actions qui exécute `@fbr/worker/once` toutes les
-15 min à la place du worker long-running (ni Redis, ni serveur à administrer).
+Mise en ligne **gratuite** possible : Render (api + web via un blueprint unique),
+Neon (Postgres) et un cron GitHub Actions qui exécute `@fbr/worker/once` toutes
+les 15 min à la place du worker long-running (ni Redis, ni serveur à administrer).
 Blueprint [`render.yaml`](render.yaml), workflow
 [`.github/workflows/poll.yml`](.github/workflows/poll.yml), procédure complète
 dans [`docs/DEPLOY.md`](docs/DEPLOY.md).
