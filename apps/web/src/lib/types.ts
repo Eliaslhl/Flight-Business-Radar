@@ -257,6 +257,17 @@ export interface CreateSearchInput {
   currency?: string;
 }
 
+export interface UpdateSearchInput {
+  label?: string | null;
+  origin?: string;
+  destinations?: string[];
+  departureWindow?: { start: string; end: string };
+  tripDuration?: { minDays: number; maxDays: number };
+  maxStops?: number;
+  maxPriceCents?: number | null;
+  targetPriceCents?: number | null;
+}
+
 export interface CreateAlertInput {
   searchId: string;
   type: AlertType;

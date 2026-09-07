@@ -12,9 +12,11 @@ import {
   replaceCombinations,
   setSearchPriority,
   setSearchStatus,
+  updateSearch,
   updateSearchSchedule,
   type Database,
   type SearchRow,
+  type UpdateSearchInput,
 } from "@fbr/database";
 import {
   buildAnalyticsReport,
@@ -36,7 +38,7 @@ import { generateDateCombinations } from "@fbr/search-engine";
 import { type Logger } from "@fbr/shared";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { requireUser } from "../auth.js";
-import { createSearchBodySchema } from "../schemas.js";
+import { createSearchBodySchema, updateSearchBodySchema } from "../schemas.js";
 import { type ApiInstance } from "../types.js";
 
 export interface SearchRoutesDeps {
@@ -209,6 +211,67 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
     const row = await setSearchPriority(db, id, body.priority);
     if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
     return toDto(row);
+  });
+
+  app.patch("/api/searches/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const current = await loadOwned(id, request, reply);
+    if (!current) return reply;
+    const parsed = updateSearchBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: "VALIDATION_FAILED",
+        issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+      });
+    }
+    const b = parsed.data;
+    // Un changement de dates / durée / route ⇒ regénérer les combinaisons + relancer.
+    const combosChanged =
+      b.departureWindow !== undefined ||
+      b.tripDuration !== undefined ||
+      b.origin !== undefined ||
+      b.destinations !== undefined;
+
+    const patch: UpdateSearchInput = {
+      ...(b.label !== undefined ? { label: b.label } : {}),
+      ...(b.origin !== undefined ? { origin: b.origin } : {}),
+      ...(b.destinations !== undefined ? { destinations: b.destinations } : {}),
+      ...(b.departureWindow !== undefined
+        ? {
+            departureWindowStart: b.departureWindow.start,
+            departureWindowEnd: b.departureWindow.end,
+          }
+        : {}),
+      ...(b.tripDuration !== undefined
+        ? { minTripDays: b.tripDuration.minDays, maxTripDays: b.tripDuration.maxDays }
+        : {}),
+      ...(b.maxStops !== undefined ? { maxStops: b.maxStops } : {}),
+      ...(b.maxPriceCents !== undefined ? { maxPriceCents: b.maxPriceCents } : {}),
+      ...(b.targetPriceCents !== undefined ? { targetPriceCents: b.targetPriceCents } : {}),
+      ...(combosChanged ? { nextRunAt: new Date() } : {}),
+    };
+    const updated = await updateSearch(db, id, patch);
+    if (!updated) return reply.code(404).send({ error: "NOT_FOUND" });
+
+    if (combosChanged) {
+      const combos = generateDateCombinations({
+        departureWindowStart: updated.departureWindowStart,
+        departureWindowEnd: updated.departureWindowEnd,
+        minTripDays: updated.minTripDays,
+        maxTripDays: updated.maxTripDays,
+      });
+      await replaceCombinations(
+        db,
+        id,
+        combos.map((c) => ({
+          outboundDate: c.outboundDate,
+          returnDate: c.returnDate,
+          tripDays: c.tripDays,
+          priorityScore: c.priorityScore,
+        })),
+      );
+    }
+    return toDto(updated);
   });
 
   app.get("/api/searches/:id/flights", async (request, reply) => {
