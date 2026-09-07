@@ -162,8 +162,16 @@ describe("loadConfig", () => {
       combinationsPerRun: 6,
       providerMinIntervalSeconds: 60,
       radarBatchSize: 8,
+      onceMaxSearches: 100,
+      snapshotRetentionDays: 180,
       mockScenario: "normal",
     });
+  });
+
+  it("REDIS_URL optionnel : absent ⇒ redis null (runner one-shot sans file)", () => {
+    expect(loadConfig({ DATABASE_URL: baseEnv.DATABASE_URL }).redis).toBeNull();
+    expect(loadConfig({ ...baseEnv, REDIS_URL: "" }).redis).toBeNull();
+    expect(loadConfig({ ...baseEnv }).redis).toEqual({ url: "redis://localhost:6379" });
   });
 
   it("expose les seuils de détection (en centimes) avec leurs défauts", () => {

@@ -96,6 +96,7 @@ NOTIFICATION_WEBHOOK_URL=https://…
 apps/
   api/       Fastify — API REST (+ /health)
   worker/    Process de fond : scheduler + workers BullMQ + analyse + alertes
+             (+ runner one-shot `once` sans Redis pour un cron / déploiement gratuit)
   web/       Next.js 15 — dashboard (TanStack Query, Recharts), proxy /api → API
 packages/
   shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
@@ -113,7 +114,7 @@ packages/
   database/         schéma Drizzle + client postgres.js + migrations + repositories
 services/
   flight-scraper/   sidecar Python (FastAPI) isolant le scraper Google Flights `fast-flights`
-docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDATIONS, AI_ADVISOR, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
+docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDATIONS, AI_ADVISOR, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEPLOY, DEVELOPMENT, PHASE-0-DISCOVERY
 ```
 
 ## Scripts racine
@@ -127,6 +128,15 @@ docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDAT
 | `pnpm test`                         | Vitest (tous les packages)                    |
 | `pnpm db:generate`                  | Génère une migration Drizzle depuis le schéma |
 | `pnpm db:migrate`                   | Applique les migrations à `DATABASE_URL`      |
+
+## Déploiement
+
+Mise en ligne **gratuite** possible : Vercel (web) + Render (api) + Neon
+(Postgres) + un cron GitHub Actions qui exécute `@fbr/worker/once` toutes les
+15 min à la place du worker long-running (ni Redis, ni serveur à administrer).
+Blueprint [`render.yaml`](render.yaml), workflow
+[`.github/workflows/poll.yml`](.github/workflows/poll.yml), procédure complète
+dans [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Licence / cadre d'usage
 

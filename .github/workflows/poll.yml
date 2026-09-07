@@ -1,0 +1,56 @@
+name: poll
+
+# Remplace le worker long-running sur un déploiement gratuit : à chaque tick,
+# on applique les migrations en attente puis on traite les recherches dues via
+# `@fbr/worker/once` (aucune file Redis). La source Travelpayouts étant en cache
+# (~48 h, plancher d'intervalle 3 h), un tick toutes les 15 min suffit largement.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      LOG_PRETTY: "false"
+      # Requis
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Source de données réelle (gratuite). Sans elle, le provider mock est utilisé.
+      TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+      TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+      # Notifications (chaque canal s'active si toute sa config est présente)
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      NOTIFICATION_WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+      SMTP_URL: ${{ secrets.SMTP_URL }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      # Conseil IA (facultatif — sans clé, générateur déterministe)
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build worker
+        run: pnpm --filter @fbr/worker... build
+
+      - name: Poll (migrate + traiter les recherches dues + purge)
+        run: node apps/worker/dist/once.js --migrate
