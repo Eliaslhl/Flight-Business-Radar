@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventBadge, PriorityBadge, StatusBadge } from "@/components/badges";
 import { AlertsPanel } from "@/components/alerts-panel";
+import { CABIN_LABEL } from "@/components/create-search-form";
 import { MonthlyChart } from "@/components/monthly-chart";
 import { PriceChart } from "@/components/price-chart";
 import {
@@ -18,6 +19,7 @@ import {
   Stat,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { flagEmoji } from "@/lib/flags";
 import {
   formatDate,
   formatDateTime,
@@ -66,6 +68,9 @@ export default function SearchDetailPage() {
     queryKey: qk.notifications(id),
     queryFn: () => api.notifications(id),
   });
+  const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
+  const flagOf = (iata: string): string =>
+    flagEmoji(airports.data?.find((a) => a.iata === iata)?.countryCode);
 
   const run = useMutation({
     mutationFn: () => api.runSearch(id),
@@ -102,9 +107,13 @@ export default function SearchDetailPage() {
               {s.label ?? `${s.origin} → ${s.destinations.join(", ") || "Radar"}`}
             </h1>
             <p className="text-sm text-[var(--color-muted)]">
-              {s.origin} → {s.destinations.join(", ") || "toutes destinations"} · {s.cabinClass} ·{" "}
-              {formatDate(s.departureWindow.start, true)}–{formatDate(s.departureWindow.end, true)}{" "}
-              · {s.tripDuration.minDays}–{s.tripDuration.maxDays} j · ≤ {s.maxStops} escale(s)
+              {flagOf(s.origin)} {s.origin} →{" "}
+              {s.destinations.length === 0
+                ? "toutes destinations"
+                : s.destinations.map((d) => `${flagOf(d)} ${d}`).join(", ")}{" "}
+              · {CABIN_LABEL[s.cabinClass]} · {formatDate(s.departureWindow.start, true)}–
+              {formatDate(s.departureWindow.end, true)} · {s.tripDuration.minDays}–
+              {s.tripDuration.maxDays} j · ≤ {s.maxStops} escale(s)
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge status={s.status} />
@@ -307,8 +316,8 @@ export default function SearchDetailPage() {
             <tbody className="divide-y divide-[var(--color-border)]">
               {(flights.data ?? []).map((f) => (
                 <tr key={f.fingerprint}>
-                  <td className="px-5 py-3">
-                    {f.origin} → {f.destination}
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    {flagOf(f.origin)} {f.origin} → {flagOf(f.destination)} {f.destination}
                   </td>
                   <td className="px-5 py-3 text-[var(--color-muted)]">
                     {formatDate(f.outboundDate, true)}

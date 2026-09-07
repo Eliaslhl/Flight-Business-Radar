@@ -3,10 +3,13 @@ import {
   CDG_LONGHAUL_DESTINATIONS,
   SEED_DESTINATION_CODES,
   WORLD_AIRPORTS,
+  countryCodeOf,
   findAirport,
   findSeedAirport,
+  flagEmoji,
   isSeedDestination,
   radarDestinationSlice,
+  seedCodesForRegion,
 } from "./airports.js";
 
 describe("seed des destinations CDG long-courrier", () => {
@@ -59,5 +62,31 @@ describe("référentiel WORLD_AIRPORTS (autocomplétion)", () => {
   it("findAirport est insensible à la casse", () => {
     expect(findAirport("cdg")).toEqual({ iata: "CDG", city: "Paris", country: "France" });
     expect(findAirport("XXX")).toBeUndefined();
+  });
+});
+
+describe("pays → code ISO / drapeau", () => {
+  it("chaque pays du référentiel a un code ISO 3166-1 alpha-2", () => {
+    const countries = new Set([
+      ...WORLD_AIRPORTS.map((a) => a.country),
+      ...CDG_LONGHAUL_DESTINATIONS.map((a) => a.country),
+    ]);
+    for (const c of countries) {
+      expect(countryCodeOf(c), `code manquant pour « ${c} »`).toMatch(/^[A-Z]{2}$/);
+    }
+  });
+
+  it("flagEmoji produit un drapeau pour un code valide, «» sinon", () => {
+    expect(flagEmoji("FR")).toBe("🇫🇷");
+    expect(flagEmoji("jp")).toBe("🇯🇵");
+    expect(flagEmoji("")).toBe("");
+    expect(flagEmoji("XXX")).toBe("");
+  });
+
+  it("seedCodesForRegion filtre la liste seed par région", () => {
+    const asia = seedCodesForRegion("ASIA");
+    expect(asia.length).toBeGreaterThan(0);
+    expect(asia).toContain("HND");
+    expect(asia).not.toContain("JFK");
   });
 });

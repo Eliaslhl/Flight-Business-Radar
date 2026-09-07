@@ -81,11 +81,11 @@ Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md). `404` si la recherche est incon
 
 ### `GET /api/radar/destinations` → `{ origin: "CDG", count, destinations }`
 
-Liste seed statique des destinations long-courrier CDG (`{ iata, city, country, region }[]`) — sert à libeller le mode Radar. Aucun secret, aucune dépendance DB.
+Liste seed statique des destinations long-courrier CDG (`{ iata, city, country, countryCode, region }[]`) — sert à libeller le mode Radar et l'analyse par continent. Aucun secret, aucune dépendance DB.
 
 ### `GET /api/airports` → `{ count, airports }`
 
-Référentiel curé (~170 aéroports `{ iata, city, country }`) pour l'autocomplétion des champs origine / destination du dashboard. Statique, aucun secret, aucune DB.
+Référentiel curé (~170 aéroports `{ iata, city, country, countryCode }[]`) pour l'autocomplétion des champs origine / destination du dashboard. `countryCode` = ISO 3166-1 alpha-2 (`""` si inconnu), pour l'affichage d'un drapeau. Statique, aucun secret, aucune DB.
 
 ### `GET /api/searches/:id/advice` → `Advice`
 

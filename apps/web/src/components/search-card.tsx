@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PriorityBadge, StatusBadge } from "./badges";
+import { CABIN_LABEL } from "./create-search-form";
 import { Card } from "./ui";
 import { api } from "@/lib/api";
+import { flagEmoji } from "@/lib/flags";
 import { formatEur, relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
 import type { Search } from "@/lib/types";
@@ -14,6 +16,10 @@ export function SearchCard({ search }: { search: Search }) {
     queryKey: qk.flights(search.id),
     queryFn: () => api.flights(search.id),
   });
+  const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
+  const flagOf = (iata: string): string =>
+    flagEmoji(airports.data?.find((a) => a.iata === iata)?.countryCode);
+  const route = [search.origin, ...search.destinations];
 
   const best =
     flights.data?.reduce<number | null>(
@@ -31,9 +37,20 @@ export function SearchCard({ search }: { search: Search }) {
             <div className="font-semibold">
               {search.label ?? `${search.origin} → ${search.destinations.join(", ") || "Radar"}`}
             </div>
-            <div className="text-sm text-[var(--color-muted)]">
-              {search.origin} → {search.destinations.join(", ") || "toutes destinations"} ·{" "}
-              {search.cabinClass}
+            <div className="flex flex-wrap items-center gap-x-1.5 text-sm text-[var(--color-muted)]">
+              {search.destinations.length === 0 ? (
+                <span>
+                  {flagOf(search.origin)} {search.origin} → toutes destinations
+                </span>
+              ) : (
+                route.map((iata, i) => (
+                  <span key={iata}>
+                    {i > 0 ? "→ " : ""}
+                    {flagOf(iata)} {iata}
+                  </span>
+                ))
+              )}
+              <span>· {CABIN_LABEL[search.cabinClass]}</span>
             </div>
           </div>
           <StatusBadge status={search.status} />

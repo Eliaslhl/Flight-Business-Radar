@@ -206,6 +206,7 @@ export interface SeedAirport {
   iata: string;
   city: string;
   country: string;
+  countryCode: string;
   region: string;
 }
 
@@ -213,6 +214,7 @@ export interface WorldAirport {
   iata: string;
   city: string;
   country: string;
+  countryCode: string;
 }
 
 export type AdviceAction =
