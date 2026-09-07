@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AirportInput } from "@/components/airport-input";
 import {
   Badge,
   Button,
@@ -208,6 +209,8 @@ function RankingTable({ rows, searchId }: { rows: RadarDestinationRank[]; search
 }
 
 function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
+  const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
+  const airportList = airports.data ?? [];
   const [form, setForm] = useState({
     origin: "CDG",
     start: "",
@@ -247,8 +250,12 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
           create.mutate();
         }}
       >
-        <Field label="Départ (IATA)">
-          <Input value={form.origin} onChange={set("origin")} maxLength={3} />
+        <Field label="Départ">
+          <AirportInput
+            value={form.origin}
+            onSelect={(iata) => setForm((f) => ({ ...f, origin: iata }))}
+            airports={airportList}
+          />
         </Field>
         <Field label="Durée min (j)">
           <Input type="number" min={1} value={form.minDays} onChange={set("minDays")} />

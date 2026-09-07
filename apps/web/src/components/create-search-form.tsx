@@ -1,7 +1,8 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { AirportInput } from "./airport-input";
 import { Button, Card, Field, Input, Select } from "./ui";
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/query-keys";
@@ -11,10 +12,12 @@ const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"]
 
 export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   const qc = useQueryClient();
+  const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
+  const list = airports.data ?? [];
+
   const [form, setForm] = useState({
     label: "",
     origin: "CDG",
-    destinations: "HND",
     cabinClass: "ECONOMY" as CabinClass,
     start: "",
     end: "",
@@ -24,8 +27,16 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     maxPriceEur: "1500",
     targetPriceEur: "1200",
   });
+  const [dests, setDests] = useState<string[]>(["HND"]);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const addDest = (iata: string) => {
+    setDests((d) => (d.includes(iata) ? d : [...d, iata]));
+  };
+  const removeDest = (iata: string) => setDests((d) => d.filter((x) => x !== iata));
+
+  const cityOf = (iata: string): string | undefined => list.find((a) => a.iata === iata)?.city;
 
   const mutation = useMutation({
     mutationFn: (body: CreateSearchInput) => api.createSearch(body),
@@ -39,10 +50,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     e.preventDefault();
     const body: CreateSearchInput = {
       origin: form.origin.trim().toUpperCase(),
-      destinations: form.destinations
-        .split(",")
-        .map((d) => d.trim().toUpperCase())
-        .filter(Boolean),
+      destinations: dests,
       cabinClass: form.cabinClass,
       departureWindow: { start: form.start, end: form.end },
       tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
@@ -59,19 +67,52 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
       <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field label="Libellé (optionnel)">
-            <Input
-              value={form.label}
-              onChange={set("label")}
-              placeholder="Paris → Tokyo Business"
-            />
+            <Input value={form.label} onChange={set("label")} placeholder="Paris → Tokyo" />
           </Field>
         </div>
-        <Field label="Départ (IATA)">
-          <Input value={form.origin} onChange={set("origin")} maxLength={3} />
+
+        <Field label="Départ">
+          <AirportInput
+            value={form.origin}
+            onSelect={(iata) => setForm((f) => ({ ...f, origin: iata }))}
+            airports={list}
+          />
         </Field>
-        <Field label="Destinations (IATA, séparées par des virgules — vide = mode Radar)">
-          <Input value={form.destinations} onChange={set("destinations")} placeholder="HND, ICN" />
-        </Field>
+
+        <div>
+          <span className="mb-1 block text-sm font-medium text-[var(--color-muted)]">
+            Destinations{" "}
+            <span className="font-normal text-[var(--color-faint)]">— vide = mode Radar</span>
+          </span>
+          {dests.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {dests.map((d) => (
+                <span
+                  key={d}
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] py-0.5 pr-1 pl-2 text-xs text-[var(--color-accent)]"
+                >
+                  <span className="font-mono font-medium">{d}</span>
+                  {cityOf(d) ? <span className="opacity-70">{cityOf(d)}</span> : null}
+                  <button
+                    type="button"
+                    onClick={() => removeDest(d)}
+                    aria-label={`retirer ${d}`}
+                    className="rounded-full px-1 leading-none hover:bg-[var(--color-accent-muted)]"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <AirportInput
+            value=""
+            onSelect={addDest}
+            airports={list}
+            placeholder="Ajouter une ville / un aéroport"
+          />
+        </div>
+
         <Field label="Classe">
           <Select value={form.cabinClass} onChange={set("cabinClass")}>
             {CABINS.map((c) => (
@@ -108,7 +149,7 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
           />
         </Field>
 
-        <div className="sm:col-span-2 flex items-center gap-3">
+        <div className="flex items-center gap-3 sm:col-span-2">
           <Button type="submit" variant="primary" disabled={mutation.isPending}>
             {mutation.isPending ? "Création…" : "Créer la recherche"}
           </Button>

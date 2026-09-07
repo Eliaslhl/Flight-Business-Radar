@@ -209,6 +209,12 @@ export interface SeedAirport {
   region: string;
 }
 
+export interface WorldAirport {
+  iata: string;
+  city: string;
+  country: string;
+}
+
 export type AdviceAction =
   "COLLECTE" | "ACHETE_MAINTENANT" | "PRET_A_ACHETER" | "SURVEILLE" | "ATTENDS";
 

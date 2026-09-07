@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { EventBadge } from "@/components/badges";
+import { ConfirmedDropsChart } from "@/components/confirmed-drops-chart";
 import { SearchCard } from "@/components/search-card";
 import {
   Button,
@@ -30,8 +31,10 @@ export default function DashboardPage() {
     })),
   });
 
-  const recent: (PriceEvent & { searchId: string })[] = eventQueries
-    .flatMap((q, i) => (q.data ?? []).map((e) => ({ ...e, searchId: rows[i]!.id })))
+  const allEvents: (PriceEvent & { searchId: string })[] = eventQueries.flatMap((q, i) =>
+    (q.data ?? []).map((e) => ({ ...e, searchId: rows[i]!.id })),
+  );
+  const recent = allEvents
     .filter((e) => e.type !== "RISE" && e.type !== "RECORD_HIGH")
     .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))
     .slice(0, 8);
@@ -99,6 +102,13 @@ export default function DashboardPage() {
             ))}
           </ul>
         )}
+
+        <div className="mt-5 border-t border-[var(--color-border)] pt-4">
+          <div className="mb-2 text-xs font-semibold tracking-wide text-[var(--color-muted)] uppercase">
+            Activité · 30 derniers jours
+          </div>
+          <ConfirmedDropsChart events={allEvents} />
+        </div>
       </Card>
     </div>
   );
