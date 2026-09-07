@@ -49,7 +49,7 @@ services:
 
   # ── Frontend ─────────────────────────────────────────────────────────────
   - type: web
-    name: fbr-web
+    name: flight-radar
     runtime: node
     plan: free
     region: ohio

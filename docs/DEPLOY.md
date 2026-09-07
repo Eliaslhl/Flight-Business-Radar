@@ -28,7 +28,7 @@ les 15 min. La source Travelpayouts étant en cache (~48 h, plancher d'intervall
 
 ```
 GitHub Actions (cron */15)          Render                              Neon
-  └─ node worker/dist/once.js        ├─ fbr-web  (Next.js) ──rewrites──┐
+  └─ node worker/dist/once.js        ├─ flight-radar  (Next.js) ──rewrites──┐
        --migrate                     │                     /api/*      ▼
        ├─ migrations                 └─ fbr-api  (Fastify) ───────────► Postgres
        ├─ recherches dues → snapshots / events / alertes ──────────────┘  ▲
@@ -55,18 +55,18 @@ GitHub Actions (cron */15)          Render                              Neon
 ### 2. API + front — Render (un seul blueprint)
 
 Le dépôt contient [`render.yaml`](../render.yaml) : il déclare **deux** services
-web gratuits, `fbr-api` et `fbr-web`. `fbr-web` reçoit automatiquement l'URL de
+web gratuits, `fbr-api` et `flight-radar`. `flight-radar` reçoit automatiquement l'URL de
 `fbr-api` (`API_INTERNAL_URL`, via `fromService`) — rien à recopier entre les
 deux.
 
 1. Sur [render.com](https://render.com) : **Sign up with GitHub**.
 2. **New ▸ Blueprint** → sélectionner le dépôt `Flight-Business-Radar`.
-   Render lit `render.yaml` et propose de créer `fbr-api` + `fbr-web`.
+   Render lit `render.yaml` et propose de créer `fbr-api` + `flight-radar`.
 3. Il demande les variables `sync: false` : coller `DATABASE_URL` (Neon) sur
    `fbr-api`. `ANTHROPIC_API_KEY` est facultatif (laisser vide sinon).
 4. **Apply**. Au bout de ~3-5 min :
    - `https://fbr-api.onrender.com/health` → `{ "status": "ok" }`
-   - `https://fbr-web.onrender.com` → le dashboard
+   - `https://flight-radar.onrender.com` → le dashboard
 
 Notes :
 
@@ -75,7 +75,7 @@ Notes :
   endormis). Sans impact sur le cron, qui parle directement à Neon.
 - L'API tourne **sans `REDIS_URL`** : `POST /api/searches/:id/run` (relance
   manuelle) répond `503`. Tout le reste fonctionne.
-- Les noms `fbr-api` / `fbr-web` peuvent recevoir un suffixe si déjà pris sur
+- Les noms `fbr-api` / `flight-radar` peuvent recevoir un suffixe si déjà pris sur
   Render ; l'`API_INTERNAL_URL` par `fromService` suit automatiquement.
 
 ### 3. Surveillance — cron GitHub Actions
@@ -102,7 +102,7 @@ conséquence ici.
 ### 4. Créer un compte
 
 `SESSION_SECRET` étant défini sur `fbr-api` (le blueprint le génère), l'API
-exige une connexion. Ouvre `https://fbr-web.onrender.com` → **Créer un
+exige une connexion. Ouvre `https://flight-radar.onrender.com` → **Créer un
 compte** (e-mail + mot de passe ≥ 8 caractères). Le **premier** compte adopte
 automatiquement les recherches / alertes déjà présentes.
 
