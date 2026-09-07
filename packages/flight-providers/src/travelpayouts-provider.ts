@@ -111,8 +111,9 @@ export class TravelpayoutsProvider implements FlightProvider {
     returnDate: string,
   ): Promise<FlightOffer[]> {
     const tripClass = tripClassParam(request.cabinClass);
+    // Travelpayouts a retiré l'auth par `?token=` sur la Data API (HTTP 400) :
+    // le jeton passe désormais par l'en-tête `X-Access-Token`.
     const params = new URLSearchParams({
-      token: this.token,
       currency: request.currency.toLowerCase(),
       origin: request.origin,
       destination,
@@ -132,7 +133,7 @@ export class TravelpayoutsProvider implements FlightProvider {
     try {
       const res = await this.fetchImpl(`${BASE_URL}?${params.toString()}`, {
         method: "GET",
-        headers: { accept: "application/json" },
+        headers: { accept: "application/json", "x-access-token": this.token },
         signal: controller.signal,
       });
       status = res.status;
