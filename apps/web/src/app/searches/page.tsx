@@ -94,6 +94,7 @@ export default function SearchesPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Recherche</th>
                 <th className="px-4 py-3 font-medium">Dates</th>
+                <th className="px-4 py-3 font-medium">Priorité</th>
                 <th className="px-4 py-3 font-medium">Cible</th>
                 <th className="px-4 py-3 font-medium">Statut</th>
                 <th className="px-4 py-3 font-medium">Prochaine analyse</th>
@@ -107,26 +108,6 @@ export default function SearchesPage() {
                     <Link href={`/searches/${s.id}`} className="font-medium hover:underline">
                       {s.label ?? `${s.origin} → ${s.destinations.join(", ") || "Radar"}`}
                     </Link>
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="text-xs text-[var(--color-muted)]">Priorité</span>
-                      <Select
-                        size="sm"
-                        className="w-24"
-                        value={s.priority}
-                        onChange={(e) =>
-                          setPriority.mutate({
-                            id: s.id,
-                            priority: e.target.value as SearchPriority,
-                          })
-                        }
-                      >
-                        {(["HIGH", "MEDIUM", "LOW"] as const).map((p) => (
-                          <option key={p} value={p}>
-                            {PRIORITY_LABEL[p]}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
                     {formatDate(s.departureWindow.start, true)}
@@ -141,6 +122,25 @@ export default function SearchesPage() {
                         true,
                       )}
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Select
+                      size="sm"
+                      className="w-24"
+                      value={s.priority}
+                      onChange={(e) =>
+                        setPriority.mutate({
+                          id: s.id,
+                          priority: e.target.value as SearchPriority,
+                        })
+                      }
+                    >
+                      {(["HIGH", "MEDIUM", "LOW"] as const).map((p) => (
+                        <option key={p} value={p}>
+                          {PRIORITY_LABEL[p]}
+                        </option>
+                      ))}
+                    </Select>
                   </td>
                   <td className="px-4 py-3">{formatEur(s.targetPriceCents)}</td>
                   <td className="px-4 py-3">
