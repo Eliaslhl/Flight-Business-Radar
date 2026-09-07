@@ -1,6 +1,8 @@
 # Flight Business Radar
 
-Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Class** au départ de **Paris-CDG** : recherche sur plages de dates, historisation des prix, détection des baisses (y compris les _flash drops_ de quelques minutes), statistiques historiques, recommandation de périodes et notifications.
+Moteur de surveillance et d'analyse des prix de billets d'avion au départ de **Paris-CDG** (ou toute origine) : recherche sur plages de dates, **historisation des prix**, détection des baisses, statistiques, **score d'opportunité / meilleur moment pour réserver**, recommandations, conseil en langage naturel et notifications.
+
+> Selon la source branchée, le radar va du **suivi de tendance / meilleur moment** (données de marché réelles mais en cache — Travelpayouts, gratuit, plutôt économie) au **quasi temps réel** avec _flash drops_ (SerpApi, payant, toutes cabines). Sans clé : données simulées (`MockFlightProvider`). Voir [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md).
 
 > Ce dépôt est un **produit logiciel** structuré (monorepo, DDD, tests, CI), pas un prototype. Il est développé **par phases** — voir [`docs/PHASE-0-DISCOVERY.md`](docs/PHASE-0-DISCOVERY.md).
 
@@ -50,22 +52,26 @@ pnpm --filter @fbr/web dev      # http://localhost:3000  (proxy /api → API)
 
 ### Données de vol réelles (optionnel)
 
-Par défaut le worker utilise `MockFlightProvider`. Deux providers réels, activés par
-simple présence de config (les deux peuvent tourner en parallèle) :
+Par défaut le worker utilise `MockFlightProvider` (données simulées). Providers réels,
+activés par simple présence de config, cumulables :
 
 ```bash
-# Gratuit, 100 % local — sidecar Python fast-flights (best-effort)
-docker compose --profile scraper up -d flight-scraper   # http://localhost:8000
-echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env
+# GRATUIT — Travelpayouts Data API : vrais prix de marché mais EN CACHE (~48 h),
+# surtout de l'économie. Token gratuit après inscription affilié.
+echo "TRAVELPAYOUTS_TOKEN=…" >> .env
 
-# Payant — SerpApi Google Flights (1 recherche = 1 crédit)
+# PAYANT — SerpApi Google Flights : quasi temps réel, toutes cabines (1 recherche = 1 crédit)
 echo "SERPAPI_API_KEY=…" >> .env
 
-# Payant — Duffel : oracle de confirmation des baisses (contenu réservable)
+# PAYANT — Duffel : oracle de confirmation des baisses (contenu réservable)
 echo "DUFFEL_API_TOKEN=duffel_test_…" >> .env
+
+# GRATUIT, local — sidecar fast-flights (best-effort ; live cassé en amont aujourd'hui)
+docker compose --profile scraper up -d flight-scraper
+echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env
 ```
 
-Détails, coûts et garde-fous : [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md).
+Nature des données, coûts, garde-fous : [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md).
 
 ### Notifications (optionnel, Phase 8)
 
@@ -95,7 +101,7 @@ packages/
   shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
   config/           chargement + validation d'environnement (Zod, fail-fast)
   flight-domain/    FlightSearchRequest, FlightOffer, value objects, fingerprint
-  flight-providers/ interface FlightProvider, ProviderRegistry, providers Mock/Fixture/FastFlights/SerpApi/Duffel
+  flight-providers/ FlightProvider, ProviderRegistry, providers Mock/Fixture/FastFlights/Travelpayouts/SerpApi/Duffel
   normalizer/       contrôle qualité + déduplication des offres
   search-engine/    génération de dates, priorité, surveillance adaptative (pur)
   analytics/        stats, tendance, price_events, opportunity score + recommandations (pur)

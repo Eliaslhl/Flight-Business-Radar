@@ -5,6 +5,7 @@ import {
   MockFlightProvider,
   ProviderRegistry,
   SerpApiFlightProvider,
+  TravelpayoutsProvider,
   type FlightProvider,
 } from "@fbr/flight-providers";
 import { type Logger } from "@fbr/shared";
@@ -12,12 +13,12 @@ import { type Logger } from "@fbr/shared";
 /**
  * Construit le registre de providers du worker. Composition par présence de
  * config (Phase 0 §5 — jamais de dépendance à un seul fournisseur) :
- * - `SERPAPI_API_KEY`   → `SerpApiFlightProvider` (payant, Google Flights).
- * - `FAST_FLIGHTS_URL`  → `FastFlightsProvider` (sidecar gratuit best-effort).
- * - aucun des deux      → `MockFlightProvider` (scénario piloté par la config).
+ * - `SERPAPI_API_KEY`      → `SerpApiFlightProvider` (payant, temps quasi réel).
+ * - `TRAVELPAYOUTS_TOKEN`  → `TravelpayoutsProvider` (gratuit, données réelles **en cache**).
+ * - `FAST_FLIGHTS_URL`     → `FastFlightsProvider` (sidecar gratuit best-effort).
+ * - aucun                  → `MockFlightProvider` (scénario piloté par la config).
  *
- * Si SerpApi **et** fast-flights sont configurés, les deux tournent en parallèle
- * et le normalizer déduplique par empreinte.
+ * Plusieurs providers configurés = exécution parallèle + dédup par le normalizer.
  */
 export const buildProviderRegistry = (config: AppConfig, logger: Logger): ProviderRegistry => {
   const providers: FlightProvider[] = [];
@@ -28,6 +29,19 @@ export const buildProviderRegistry = (config: AppConfig, logger: Logger): Provid
         apiKey: config.providers.serpapi.apiKey,
         timeoutMs: config.providers.serpapi.timeoutMs,
         maxDestinations: config.providers.serpapi.maxDestinations,
+        logger,
+      }),
+    );
+  }
+  if (config.providers.travelpayouts) {
+    providers.push(
+      new TravelpayoutsProvider({
+        token: config.providers.travelpayouts.token,
+        ...(config.providers.travelpayouts.marker
+          ? { marker: config.providers.travelpayouts.marker }
+          : {}),
+        timeoutMs: config.providers.travelpayouts.timeoutMs,
+        maxDestinations: config.providers.travelpayouts.maxDestinations,
         logger,
       }),
     );

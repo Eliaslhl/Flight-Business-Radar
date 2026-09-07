@@ -14,6 +14,11 @@
 
 `thresholdEurCents` (optionnel) agit comme **plafond de prix** pour `TARGET_PRICE` / `RECORD_LOW` : l'alerte ne se déclenche qu'en dessous.
 
+> **`FLASH_DROP` dépend de la fraîcheur de la source.** Avec un provider quasi temps réel
+> (SerpApi) elle a du sens ; avec une source **en cache** (Travelpayouts, ~48 h) une baisse
+> de quelques minutes est invisible — l'alerte reste active mais ne se déclenchera
+> quasiment jamais. Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md).
+
 ## `@fbr/alerting` (pur)
 
 - `matchAlerts(events, alerts)` : associe les événements aux alertes activées, **un seul match par alerte** (l'événement le plus fort — `FLASH_DROP` > `RECORD_LOW` > … > `DROP`).

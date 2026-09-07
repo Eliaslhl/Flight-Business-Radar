@@ -26,12 +26,29 @@ const confirmationOracle = buildConfirmationOracle(config, logger);
 const fx = buildFxService(config, db.db);
 const notificationService = buildNotificationService(config, logger);
 
+// Travelpayouts est du cache (~48 h) : sonder plus vite qu'un palier de 3 h ne
+// sert à rien et grille le quota. On relève le plancher si c'est la seule
+// source réelle (SerpApi / fast-flights la surclassent en fraîcheur).
+const onlyCachedSource =
+  config.providers.travelpayouts !== null &&
+  config.providers.serpapi === null &&
+  config.providers.fastFlights === null;
+const providerMinIntervalSeconds = onlyCachedSource
+  ? Math.max(config.engine.providerMinIntervalSeconds, 10_800)
+  : config.engine.providerMinIntervalSeconds;
+if (onlyCachedSource) {
+  logger.info(
+    { event: "cached_source_interval_floor", providerMinIntervalSeconds },
+    "source en cache uniquement — plancher d'intervalle relevé",
+  );
+}
+
 const processorDeps: SearchProcessorDeps = {
   db: db.db,
   registry,
   logger,
   combinationsPerRun: config.engine.combinationsPerRun,
-  providerMinIntervalSeconds: config.engine.providerMinIntervalSeconds,
+  providerMinIntervalSeconds,
   radarBatchSize: config.engine.radarBatchSize,
   thresholds: {
     ...DEFAULT_DROP_THRESHOLDS,

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { type Database } from "../client.js";
 import {
   flightOffers,
@@ -55,6 +55,41 @@ export const insertSnapshots = async (
     .values(inputs.map(toValues))
     .returning({ id: priceSnapshots.id });
   return rows.length;
+};
+
+/**
+ * Écarte les snapshots dont le couple `(flight_offer_id, observed_at)` est déjà
+ * en base — indispensable pour les providers à **données en cache**
+ * (Travelpayouts) qui renvoient les mêmes lignes horodatées à chaque sondage.
+ * Sans effet pour les providers qui horodatent à « maintenant » (jamais de
+ * collision).
+ */
+export const dedupeAgainstExistingSnapshots = async (
+  db: Database,
+  inputs: readonly InsertSnapshotInput[],
+): Promise<InsertSnapshotInput[]> => {
+  const withDate = inputs.filter((i) => i.observedAt instanceof Date);
+  if (withDate.length === 0) return [...inputs];
+
+  const offerIds = [...new Set(withDate.map((i) => i.flightOfferId))];
+  const since = new Date(Math.min(...withDate.map((i) => i.observedAt!.getTime())));
+
+  const existing = await db
+    .select({
+      flightOfferId: priceSnapshots.flightOfferId,
+      observedAt: priceSnapshots.observedAt,
+    })
+    .from(priceSnapshots)
+    .where(
+      and(inArray(priceSnapshots.flightOfferId, offerIds), gte(priceSnapshots.observedAt, since)),
+    );
+
+  const seen = new Set(existing.map((r) => `${r.flightOfferId}|${r.observedAt.toISOString()}`));
+  return inputs.filter(
+    (i) =>
+      !(i.observedAt instanceof Date) ||
+      !seen.has(`${i.flightOfferId}|${i.observedAt.toISOString()}`),
+  );
 };
 
 export const listSnapshotsForSearch = async (

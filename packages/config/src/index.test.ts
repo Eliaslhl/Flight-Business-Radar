@@ -36,6 +36,21 @@ describe("loadConfig", () => {
     });
   });
 
+  it("structure providers.travelpayouts (source réelle gratuite en cache) depuis TRAVELPAYOUTS_TOKEN", () => {
+    expect(loadConfig({ ...baseEnv }).providers.travelpayouts).toBeNull();
+    const cfg = loadConfig({
+      ...baseEnv,
+      TRAVELPAYOUTS_TOKEN: "tp-abc",
+      TRAVELPAYOUTS_MARKER: "998877",
+    });
+    expect(cfg.providers.travelpayouts).toEqual({
+      token: "tp-abc",
+      marker: "998877",
+      timeoutMs: 20_000,
+      maxDestinations: 8,
+    });
+  });
+
   it("structure providers.duffel (oracle de confirmation) depuis DUFFEL_API_TOKEN", () => {
     expect(loadConfig({ ...baseEnv }).providers.duffel).toBeNull();
     const cfg = loadConfig({ ...baseEnv, DUFFEL_API_TOKEN: "duffel_test_abc" });

@@ -39,6 +39,7 @@ La déduplication inter-providers est faite ensuite par `@fbr/normalizer`.
 | `MockFlightProvider`    | ✅ Phase 2 | Provider de test déterministe. Aucune I/O.                                                                                                                         |
 | `FixtureFlightProvider` | ✅ Phase 7 | Rejoue des `FlightOffer` canoniques (tests, CI, démo hors-ligne). Aucune I/O.                                                                                      |
 | `FastFlightsProvider`   | ✅ Phase 7 | Client HTTP du sidecar `services/flight-scraper` (Google Flights via `fast-flights`). Actif quand `FAST_FLIGHTS_URL` est défini.                                   |
+| `TravelpayoutsProvider` | ✅         | **Réel, gratuit, mais EN CACHE** (~48 h, économie surtout). Actif quand `TRAVELPAYOUTS_TOKEN` est défini. Radar de tendance / meilleur moment.                     |
 | `SerpApiFlightProvider` | ✅         | **Provider réel payant** (SerpApi Google Flights). Actif quand `SERPAPI_API_KEY` est défini. 1 recherche = 1 crédit SerpApi.                                       |
 | `DuffelFlightProvider`  | ✅         | **Payant — oracle de confirmation** (contenu réservable NDC/GDS). Actif quand `DUFFEL_API_TOKEN` est défini. Hors `ProviderRegistry` : branché sur le `confirmer`. |
 
@@ -47,12 +48,13 @@ La déduplication inter-providers est faite ensuite par `@fbr/normalizer`.
 `buildProviderRegistry` compose la liste de **recherche** par présence de config (Phase 0
 §5 — jamais de dépendance à un seul fournisseur) :
 
-| Config présente    | Providers de recherche actifs                                   |
-| ------------------ | --------------------------------------------------------------- |
-| `SERPAPI_API_KEY`  | `serpapi`                                                       |
-| `FAST_FLIGHTS_URL` | `fast-flights`                                                  |
-| les deux           | `serpapi` + `fast-flights` (parallèle, dédup par le normalizer) |
-| aucun              | `mock`                                                          |
+| Config présente       | Providers de recherche actifs              |
+| --------------------- | ------------------------------------------ |
+| `SERPAPI_API_KEY`     | `serpapi`                                  |
+| `TRAVELPAYOUTS_TOKEN` | `travelpayouts`                            |
+| `FAST_FLIGHTS_URL`    | `fast-flights`                             |
+| plusieurs             | tous en parallèle, dédup par le normalizer |
+| aucun                 | `mock`                                     |
 
 `buildConfirmationOracle` renvoie en plus un `DuffelFlightProvider` (ou `null`) — utilisé
 **uniquement** par le `confirmer` du pipeline d'alerte, pas dans la recherche.
@@ -133,6 +135,59 @@ Puis dans `.env` : `FAST_FLIGHTS_URL=http://localhost:8000`.
 Chaque appel provider (succès **ou** échec) est journalisé en base par le worker :
 table `provider_requests` (`provider, search_id, ok, offer_count, latency_ms, error_code,
 error_message, created_at`). Exposé via `GET /api/searches/:id/provider-requests`.
+
+## `TravelpayoutsProvider` — Travelpayouts Data API (gratuit, données en cache)
+
+**La seule source réelle gratuite et immédiatement accessible.** Travelpayouts a deux API :
+la _Flights Search_ (cotations live) exige une candidature + 50 000 MAU ; la **_Data API_**
+donne un token **gratuit et instantané** après inscription affilié — mais renvoie des **prix
+en cache** issus des vraies recherches des utilisateurs Aviasales.
+
+### Nature des données — à assumer
+
+- **Fraîcheur ~48 h** (endpoint `/v2/prices/latest`). Chaque ligne porte `found_at` = quand
+  le prix a réellement été trouvé → c'est lui qui sert d'`observedAt`, **pas** l'heure du
+  sondage. L'historique reflète donc la réalité, pas un artefact de polling.
+- **Économie surtout.** Le param `trip_class` existe (`0` éco / `1` business / `2` first)
+  mais le business est très peu représenté dans le cache Aviasales.
+- **Pas de flash drops.** Une baisse de quelques minutes est invisible dans une donnée en
+  cache. L'alerte `FLASH_DROP` reste dans le code mais ne se déclenchera quasiment jamais
+  avec cette source. Tout le reste tient : tendance, meilleur mois/dates, score
+  d'opportunité, recommandations, advisor, alertes `TARGET_PRICE` / `PRICE_DROP` (graduelles)
+  / `RECORD_LOW`.
+
+### Requête
+
+`GET https://api.travelpayouts.com/v2/prices/latest` avec `token`, `currency=eur`, `origin`,
+`destination`, `period_type=month`, `beginning_of_period=<YYYY-MM-01>`, `one_way=false`,
+`trip_class`, `sorting=price`, `show_to_affiliates=true`. La réponse couvre le mois entier ;
+le provider **filtre** sur le couple `(depart_date, return_date)` exact de la combinaison et
+sur `trip_class`.
+
+### Conversion & robustesse
+
+- 1 appel = 1 couple de dates × 1 destination. `value` (unités entières) → centimes.
+  Horaires non fournis par cet endpoint → synthétisés ; `number_of_changes` → escales.
+  `airline` absent → code `XX` (l'empreinte retombe alors sur route + dates + escales, ce
+  qui est le bon grain pour un suivi de « le vol le moins cher »).
+- `HTTP 401` / `429` → `ProviderError` **non-retryable** ; `5xx` → retryable ;
+  `{ success: false }` → non-retryable ; aucune ligne pour le couple → `[]`.
+- **Anti-doublon** : `dedupeAgainstExistingSnapshots` (dans le worker) écarte les lignes
+  déjà en base au même `(flight_offer_id, observed_at)` — sinon chaque sondage ré-insère les
+  mêmes lignes de cache.
+- **Cadence** : si Travelpayouts est la **seule** source réelle, le worker relève le
+  plancher d'intervalle à **3 h** (`cached_source_interval_floor`) — sonder plus vite ne
+  rapporte rien et grille le quota (~200 req/h).
+- `marker` (affilié) fourni → génère un lien de réservation Aviasales (`bookingUrl`).
+
+### Config (`.env`)
+
+| Variable                         | Défaut   | Rôle                                                                 |
+| -------------------------------- | -------- | -------------------------------------------------------------------- |
+| `TRAVELPAYOUTS_TOKEN`            | _(vide)_ | Active le provider. Token gratuit (inscription affilié). **Secret.** |
+| `TRAVELPAYOUTS_MARKER`           | _(vide)_ | Marqueur affilié — active les liens de réservation Aviasales         |
+| `TRAVELPAYOUTS_TIMEOUT_MS`       | 20000    | Timeout par appel                                                    |
+| `TRAVELPAYOUTS_MAX_DESTINATIONS` | 8        | Plafond de destinations par run (mode Radar)                         |
 
 ## `SerpApiFlightProvider` — SerpApi Google Flights (payant)
 

@@ -97,6 +97,13 @@ export const configSchema = z
     // utilise FastFlightsProvider au lieu du MockFlightProvider.
     FAST_FLIGHTS_URL: z.string().url().optional(),
     FAST_FLIGHTS_TIMEOUT_MS: posInt.default(20_000),
+    // Travelpayouts Data API — source RÉELLE GRATUITE mais EN CACHE (~48 h),
+    // surtout de l'économie. Radar de tendance / meilleur moment, pas de flash drop.
+    TRAVELPAYOUTS_TOKEN: optionalSecret,
+    /** Marqueur affilié (optionnel) — active les liens de réservation Aviasales. */
+    TRAVELPAYOUTS_MARKER: z.string().trim().min(1).optional(),
+    TRAVELPAYOUTS_TIMEOUT_MS: posInt.default(20_000),
+    TRAVELPAYOUTS_MAX_DESTINATIONS: posInt.max(60).default(8),
     // SerpApi Google Flights (1er provider réel payant — 1 recherche = 1 crédit).
     SERPAPI_API_KEY: optionalSecret,
     SERPAPI_TIMEOUT_MS: posInt.default(20_000),
@@ -168,6 +175,14 @@ export const configSchema = z
     providers: {
       fastFlights: raw.FAST_FLIGHTS_URL
         ? { url: raw.FAST_FLIGHTS_URL, timeoutMs: raw.FAST_FLIGHTS_TIMEOUT_MS }
+        : null,
+      travelpayouts: raw.TRAVELPAYOUTS_TOKEN
+        ? {
+            token: raw.TRAVELPAYOUTS_TOKEN,
+            marker: raw.TRAVELPAYOUTS_MARKER ?? null,
+            timeoutMs: raw.TRAVELPAYOUTS_TIMEOUT_MS,
+            maxDestinations: raw.TRAVELPAYOUTS_MAX_DESTINATIONS,
+          }
         : null,
       serpapi: raw.SERPAPI_API_KEY
         ? {

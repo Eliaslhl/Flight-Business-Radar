@@ -24,6 +24,17 @@ describe("buildProviderRegistry", () => {
     expect(names({ FAST_FLIGHTS_URL: "http://localhost:8000" })).toEqual(["fast-flights"]);
   });
 
+  it("TRAVELPAYOUTS_TOKEN ⇒ TravelpayoutsProvider (source réelle gratuite)", () => {
+    expect(names({ TRAVELPAYOUTS_TOKEN: "tp-tok" })).toEqual(["travelpayouts"]);
+  });
+
+  it("SerpApi + Travelpayouts ⇒ les deux (précision payante + baseline gratuite)", () => {
+    expect(names({ SERPAPI_API_KEY: "sk", TRAVELPAYOUTS_TOKEN: "tp" })).toEqual([
+      "serpapi",
+      "travelpayouts",
+    ]);
+  });
+
   it("SerpApi + fast-flights ⇒ les deux, en parallèle (dédup par le normalizer)", () => {
     expect(
       names({ SERPAPI_API_KEY: "sk-serp", FAST_FLIGHTS_URL: "http://localhost:8000" }),
