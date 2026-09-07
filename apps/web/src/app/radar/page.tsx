@@ -227,6 +227,8 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
         label: `Radar ${form.origin.toUpperCase()}`,
         origin: form.origin.trim().toUpperCase(),
         destinations: [],
+        // La source gratuite (Travelpayouts) ne sert que l'économie.
+        cabinClass: "ECONOMY",
         departureWindow: { start: form.start, end: form.end },
         tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
       };

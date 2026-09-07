@@ -16,13 +16,18 @@ const request = (overrides: Record<string, unknown> = {}): FlightSearchRequest =
 
 const NOW = "2026-11-06T09:00:00.000Z";
 
-/** Réponse Travelpayouts `GET /v2/prices/latest` (données en cache) — contract test. */
+/**
+ * Réponse Travelpayouts `GET /v2/prices/latest` (données en cache) — contract
+ * test. `period_type=month` renvoie tout le mois : on garde les départs dans la
+ * fenêtre `[2026-11-10, 2026-11-30]` et une durée de séjour dans `[10, 14]`.
+ */
 const TP_FIXTURE = {
   success: true,
   currency: "eur",
   error: null,
   data: [
     {
+      // dans la fenêtre, 10 nuits, éco, direct → GARDÉ
       origin: "CDG",
       destination: "JFK",
       depart_date: "2026-11-10",
@@ -35,6 +40,7 @@ const TP_FIXTURE = {
       actual: true,
     },
     {
+      // même couple, 1 escale → GARDÉ
       origin: "CDG",
       destination: "JFK",
       depart_date: "2026-11-10",
@@ -46,18 +52,40 @@ const TP_FIXTURE = {
       actual: true,
     },
     {
-      // autre couple de dates → filtré
+      // départ 11-12 (dans la fenêtre), 12 nuits (dans [10,14]) → GARDÉ
       origin: "CDG",
       destination: "JFK",
       depart_date: "2026-11-12",
-      return_date: "2026-11-22",
+      return_date: "2026-11-24",
       value: 350,
       trip_class: 0,
       number_of_changes: 0,
       found_at: "2026-11-06T03:00:00Z",
     },
     {
-      // business → filtré (requête économie)
+      // départ hors fenêtre (décembre) → FILTRÉ
+      origin: "CDG",
+      destination: "JFK",
+      depart_date: "2026-12-05",
+      return_date: "2026-12-15",
+      value: 300,
+      trip_class: 0,
+      number_of_changes: 0,
+      found_at: "2026-11-06T03:30:00Z",
+    },
+    {
+      // durée 3 nuits < minDays → FILTRÉ
+      origin: "CDG",
+      destination: "JFK",
+      depart_date: "2026-11-15",
+      return_date: "2026-11-18",
+      value: 275,
+      trip_class: 0,
+      number_of_changes: 0,
+      found_at: "2026-11-06T03:45:00Z",
+    },
+    {
+      // business → FILTRÉ (Data API éco uniquement)
       origin: "CDG",
       destination: "JFK",
       depart_date: "2026-11-10",
@@ -87,10 +115,13 @@ describe("TravelpayoutsProvider", () => {
     const provider = new TravelpayoutsProvider({ token: "tp-tok", fetchImpl, now: () => NOW });
 
     const offers = await provider.searchFlights(request());
-    // 2 lignes pour 2026-11-10→2026-11-20 en éco (0 et 1 escale) ; les autres filtrées
-    expect(offers).toHaveLength(2);
+    // 3 lignes éco dans la fenêtre + durée valide ; hors-fenêtre / séjour trop
+    // court / business → filtrées
+    expect(offers).toHaveLength(3);
 
-    const direct = offers.find((o) => o.outbound.stops === 0)!;
+    const direct = offers.find(
+      (o) => o.outbound.stops === 0 && o.outbound.departureDate === "2026-11-10",
+    )!;
     expect(direct.provider).toBe("travelpayouts");
     expect(direct.origin).toBe("CDG");
     expect(direct.destination).toBe("JFK");
@@ -109,11 +140,9 @@ describe("TravelpayoutsProvider", () => {
     expect(direct.fingerprint).not.toBe(oneStop.fingerprint);
   });
 
-  it("envoie les bons paramètres (période mensuelle, trip_class, devise, affiliés)", async () => {
+  it("envoie les bons paramètres (période mensuelle, trip_class éco, devise, affiliés)", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(ok(TP_FIXTURE));
-    await new TravelpayoutsProvider({ token: "tp-tok", fetchImpl }).searchFlights(
-      request({ cabinClass: "BUSINESS" }),
-    );
+    await new TravelpayoutsProvider({ token: "tp-tok", fetchImpl }).searchFlights(request());
     const call = fetchImpl.mock.calls[0] as [string, { headers: Record<string, string> }];
     const url = new URL(call[0]);
     expect(url.origin + url.pathname).toBe("https://api.travelpayouts.com/v2/prices/latest");
@@ -125,9 +154,19 @@ describe("TravelpayoutsProvider", () => {
     expect(q.get("destination")).toBe("JFK");
     expect(q.get("period_type")).toBe("month");
     expect(q.get("beginning_of_period")).toBe("2026-11-01");
-    expect(q.get("trip_class")).toBe("1"); // business
+    expect(q.get("trip_class")).toBe("0"); // Data API éco uniquement
     expect(q.get("currency")).toBe("eur");
     expect(q.get("show_to_affiliates")).toBe("true");
+  });
+
+  it("cabine non-économie ⇒ [] sans appel réseau (Data API éco uniquement)", async () => {
+    const fetchImpl = vi.fn();
+    for (const cabinClass of ["BUSINESS", "FIRST", "PREMIUM_ECONOMY"] as const) {
+      await expect(
+        new TravelpayoutsProvider({ token: "t", fetchImpl }).searchFlights(request({ cabinClass })),
+      ).resolves.toEqual([]);
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("génère un lien Aviasales quand un marqueur affilié est fourni", async () => {

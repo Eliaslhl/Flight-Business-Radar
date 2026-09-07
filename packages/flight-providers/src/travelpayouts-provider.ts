@@ -30,10 +30,6 @@ export interface TravelpayoutsProviderOptions {
 
 const BASE_URL = "https://api.travelpayouts.com/v2/prices/latest";
 
-/** `trip_class` Travelpayouts : 0 économie · 1 business · 2 first. */
-const tripClassParam = (cabin: FlightSearchRequest["cabinClass"]): number =>
-  cabin === "BUSINESS" ? 1 : cabin === "FIRST" ? 2 : 0;
-
 /** ISO 8601, en ajoutant `Z` si Travelpayouts omet le fuseau. `null` si invalide. */
 const toIso = (raw: string | undefined): string | null => {
   if (!raw) return null;
@@ -46,6 +42,10 @@ const toIso = (raw: string | undefined): string | null => {
 };
 
 const ddmm = (isoDay: string): string => `${isoDay.slice(8, 10)}${isoDay.slice(5, 7)}`;
+
+/** Nombre de nuits entre deux dates ISO (`YYYY-MM-DD`). */
+const daysBetween = (from: string, to: string): number =>
+  Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
 
 /**
  * Provider **gratuit** Travelpayouts Data API — **données réelles mais en cache**
@@ -84,6 +84,17 @@ export class TravelpayoutsProvider implements FlightProvider {
         retryable: false,
       });
     }
+    // Le Data API gratuit ne sert que l'économie (`trip_class=0` ; toute autre
+    // valeur ⇒ HTTP 400 « Only economy trip class is supported »). Les cabines
+    // supérieures sont simplement hors périmètre de cette source.
+    if (request.cabinClass !== "ECONOMY") {
+      this.logger?.debug(
+        { provider: this.name, cabinClass: request.cabinClass },
+        "travelpayouts : cabine non-économie ignorée (source éco uniquement)",
+      );
+      return [];
+    }
+
     let destinations = [...request.destinations];
     if (destinations.length > this.maxDestinations) {
       this.logger?.debug(
@@ -93,13 +104,8 @@ export class TravelpayoutsProvider implements FlightProvider {
       destinations = destinations.slice(0, this.maxDestinations);
     }
 
-    const outboundDate = request.departureWindow.start;
-    const returnDate = addDays(isoDate(outboundDate), request.tripDuration.minDays);
-
     const perDestination = await Promise.all(
-      destinations.map((destination) =>
-        this.searchOne(request, destination, outboundDate, returnDate),
-      ),
+      destinations.map((destination) => this.searchOne(request, destination)),
     );
     return perDestination.flat();
   }
@@ -107,20 +113,19 @@ export class TravelpayoutsProvider implements FlightProvider {
   private async searchOne(
     request: FlightSearchRequest,
     destination: string,
-    outboundDate: string,
-    returnDate: string,
   ): Promise<FlightOffer[]> {
-    const tripClass = tripClassParam(request.cabinClass);
+    const { start: windowStart, end: windowEnd } = request.departureWindow;
     // Travelpayouts a retiré l'auth par `?token=` sur la Data API (HTTP 400) :
-    // le jeton passe désormais par l'en-tête `X-Access-Token`.
+    // le jeton passe désormais par l'en-tête `X-Access-Token`. `trip_class` est
+    // toujours `0` (garde économie faite en amont dans `searchFlights`).
     const params = new URLSearchParams({
       currency: request.currency.toLowerCase(),
       origin: request.origin,
       destination,
       period_type: "month",
-      beginning_of_period: `${outboundDate.slice(0, 7)}-01`,
+      beginning_of_period: `${windowStart.slice(0, 7)}-01`,
       one_way: "false",
-      trip_class: String(tripClass),
+      trip_class: "0",
       limit: "1000",
       sorting: "price",
       show_to_affiliates: "true",
@@ -178,15 +183,25 @@ export class TravelpayoutsProvider implements FlightProvider {
       });
     }
 
+    // `period_type=month` renvoie les meilleurs tarifs de tout le mois, dates
+    // variées : on garde ceux dont le départ tombe dans la fenêtre demandée et
+    // dont la durée de séjour respecte `tripDuration`.
+    const { minDays, maxDays } = request.tripDuration;
     const currency = (parsed.data.currency ?? request.currency).toUpperCase();
     return parsed.data.data
-      .filter(
-        (r) =>
-          r.depart_date === outboundDate &&
-          (r.return_date ?? null) === returnDate &&
-          (r.trip_class === undefined || r.trip_class === tripClass),
-      )
-      .map((row) => this.toFlightOffer(request, destination, returnDate, currency, row))
+      .filter((r) => {
+        if (r.trip_class !== undefined && r.trip_class !== 0) return false;
+        if (r.depart_date < windowStart || r.depart_date > windowEnd) return false;
+        if (r.return_date) {
+          const days = daysBetween(r.depart_date, r.return_date);
+          if (days < minDays || days > maxDays) return false;
+        }
+        return true;
+      })
+      .map((row) => {
+        const returnDate = row.return_date ?? addDays(isoDate(row.depart_date), minDays);
+        return this.toFlightOffer(request, destination, returnDate, currency, row);
+      })
       .filter((o): o is FlightOffer => o !== null);
   }
 
