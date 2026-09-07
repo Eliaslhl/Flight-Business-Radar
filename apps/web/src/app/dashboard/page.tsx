@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { EventBadge } from "@/components/badges";
 import { SearchCard } from "@/components/search-card";
-import { Card, CardTitle, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  CardTitle,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Spinner,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatEur, relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
@@ -32,21 +40,17 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-[var(--color-muted)]">
-            {rows.length} recherche{rows.length > 1 ? "s" : ""} · {activeCount} active
-            {activeCount > 1 ? "s" : ""}
-          </p>
-        </div>
-        <Link
-          href="/searches"
-          className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
-        >
-          + Nouvelle recherche
-        </Link>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${rows.length} recherche${rows.length > 1 ? "s" : ""} · ${activeCount} active${
+          activeCount > 1 ? "s" : ""
+        }`}
+        actions={
+          <Link href="/searches">
+            <Button variant="primary">+ Nouvelle recherche</Button>
+          </Link>
+        }
+      />
 
       {searches.isLoading ? (
         <Spinner />

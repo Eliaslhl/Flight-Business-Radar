@@ -7,7 +7,16 @@ import { EventBadge, PriorityBadge, StatusBadge } from "@/components/badges";
 import { AlertsPanel } from "@/components/alerts-panel";
 import { MonthlyChart } from "@/components/monthly-chart";
 import { PriceChart } from "@/components/price-chart";
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  EmptyState,
+  ErrorState,
+  Spinner,
+  Stat,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import {
   formatDate,
@@ -318,16 +327,6 @@ export default function SearchDetailPage() {
         )}
       </Card>
     </div>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string | undefined }) {
-  return (
-    <Card className="p-4">
-      <div className="text-xs text-[var(--color-muted)]">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
-      {hint ? <div className="text-xs text-[var(--color-warn)]">{hint}</div> : null}
-    </Card>
   );
 }
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { alertTypeLabel } from "@/components/badges";
-import { Badge, Button, Card, EmptyState, ErrorState, Spinner } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
@@ -38,7 +38,10 @@ export default function AlertsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Alertes</h1>
+      <PageHeader
+        title="Alertes"
+        subtitle="Toutes les alertes de tes recherches — activation, désactivation, suppression."
+      />
 
       {searches.isLoading ? (
         <Spinner />

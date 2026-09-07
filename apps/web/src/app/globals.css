@@ -1,16 +1,69 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #f7f7f8;
+/* ── Design tokens ────────────────────────────────────────────────────────
+   Palette claire par défaut ; la variante sombre suit le thème système
+   (aucune bascule manuelle). Chaque couleur est définie dans les DEUX
+   contextes — jamais uniquement dans le bloc media. */
+:root {
+  --color-bg: #f6f6f8;
   --color-surface: #ffffff;
-  --color-border: #e6e6ea;
-  --color-fg: #16161a;
-  --color-muted: #6b6b76;
-  --color-accent: #3538cd;
+  --color-surface-2: #fbfbfd;
+  --color-border: #e7e7ec;
+  --color-border-strong: #d3d3db;
+  --color-fg: #17171b;
+  --color-muted: #6a6a76;
+  --color-faint: #9a9aa6;
+
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
   --color-accent-soft: #eef0ff;
+  --color-accent-muted: #c7c9f2;
+  --color-on-accent: #ffffff;
+
   --color-ok: #067647;
+  --color-ok-soft: #e7f6ee;
   --color-warn: #b54708;
+  --color-warn-soft: #fdf0e6;
   --color-danger: #b42318;
+  --color-danger-soft: #fdeceb;
+
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --shadow-sm: 0 1px 2px rgb(16 16 26 / 0.04), 0 1px 3px rgb(16 16 26 / 0.06);
+  --shadow-md: 0 4px 12px rgb(16 16 26 / 0.08), 0 2px 4px rgb(16 16 26 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0e0e12;
+    --color-surface: #17171d;
+    --color-surface-2: #1d1d24;
+    --color-border: #2a2a33;
+    --color-border-strong: #3a3a45;
+    --color-fg: #ececf0;
+    --color-muted: #9a9aa6;
+    --color-faint: #6a6a76;
+
+    --color-accent: #7c78f0;
+    --color-accent-hover: #918dff;
+    --color-accent-soft: #23233a;
+    --color-accent-muted: #3a3a5c;
+    --color-on-accent: #0e0e12;
+
+    --color-ok: #4ade80;
+    --color-ok-soft: #16281f;
+    --color-warn: #f59e42;
+    --color-warn-soft: #2a2016;
+    --color-danger: #f87171;
+    --color-danger-soft: #2a1717;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 6px 20px rgb(0 0 0 / 0.4);
+  }
+}
+
+html {
+  color-scheme: light dark;
 }
 
 html,
@@ -18,8 +71,20 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  line-height: 1.55;
 }
 
 * {
@@ -28,4 +93,14 @@ body {
 
 a {
   color: inherit;
+}
+
+/* Prix, compteurs : chiffres à chasse fixe pour un alignement propre. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+::selection {
+  background: var(--color-accent-soft);
 }

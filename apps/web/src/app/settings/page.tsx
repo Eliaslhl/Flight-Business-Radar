@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, CardTitle } from "@/components/ui";
+import { Badge, Card, CardTitle, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/query-keys";
 
@@ -15,7 +15,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Réglages</h1>
+      <PageHeader title="Réglages" subtitle="État de l'API, canaux de notification, devise." />
 
       <Card>
         <CardTitle>API</CardTitle>
