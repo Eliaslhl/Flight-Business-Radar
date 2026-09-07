@@ -60,6 +60,9 @@ echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env
 
 # Payant — SerpApi Google Flights (1 recherche = 1 crédit)
 echo "SERPAPI_API_KEY=…" >> .env
+
+# Payant — Duffel : oracle de confirmation des baisses (contenu réservable)
+echo "DUFFEL_API_TOKEN=duffel_test_…" >> .env
 ```
 
 Détails, coûts et garde-fous : [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md).
@@ -92,7 +95,7 @@ packages/
   shared/           logger pino, erreurs, Result, helpers monétaires, noms d'événements
   config/           chargement + validation d'environnement (Zod, fail-fast)
   flight-domain/    FlightSearchRequest, FlightOffer, value objects, fingerprint
-  flight-providers/ interface FlightProvider, ProviderRegistry, Mock/Fixture/FastFlights providers
+  flight-providers/ interface FlightProvider, ProviderRegistry, providers Mock/Fixture/FastFlights/SerpApi/Duffel
   normalizer/       contrôle qualité + déduplication des offres
   search-engine/    génération de dates, priorité, surveillance adaptative (pur)
   analytics/        stats, tendance, price_events, opportunity score + recommandations (pur)

@@ -102,7 +102,10 @@ export const configSchema = z
     SERPAPI_TIMEOUT_MS: posInt.default(20_000),
     /** Plafond de destinations interrogées par run (garde-fou budget mode Radar). */
     SERPAPI_MAX_DESTINATIONS: posInt.max(60).default(8),
+    // Duffel (API v2) — oracle de confirmation des baisses exceptionnelles.
     DUFFEL_API_TOKEN: optionalSecret,
+    DUFFEL_TIMEOUT_MS: posInt.default(20_000),
+    DUFFEL_MAX_DESTINATIONS: posInt.max(60).default(4),
 
     // Notifications (Phase 8) — chaque canal s'active quand SA config est
     // complète ; le canal `console` est toujours actif. Aucun secret en dur.
@@ -173,7 +176,13 @@ export const configSchema = z
             maxDestinations: raw.SERPAPI_MAX_DESTINATIONS,
           }
         : null,
-      duffel: raw.DUFFEL_API_TOKEN ? { token: raw.DUFFEL_API_TOKEN } : null,
+      duffel: raw.DUFFEL_API_TOKEN
+        ? {
+            token: raw.DUFFEL_API_TOKEN,
+            timeoutMs: raw.DUFFEL_TIMEOUT_MS,
+            maxDestinations: raw.DUFFEL_MAX_DESTINATIONS,
+          }
+        : null,
     },
     notifications: {
       telegram:

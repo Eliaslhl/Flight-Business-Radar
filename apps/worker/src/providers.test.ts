@@ -1,7 +1,7 @@
 import { loadConfig } from "@fbr/config";
 import { createSilentLogger } from "@fbr/shared";
 import { describe, expect, it } from "vitest";
-import { buildProviderRegistry } from "./providers.js";
+import { buildConfirmationOracle, buildProviderRegistry } from "./providers.js";
 
 const baseEnv = {
   DATABASE_URL: "postgresql://fbr:fbr@localhost:5432/fbr",
@@ -28,5 +28,18 @@ describe("buildProviderRegistry", () => {
     expect(
       names({ SERPAPI_API_KEY: "sk-serp", FAST_FLIGHTS_URL: "http://localhost:8000" }),
     ).toEqual(["serpapi", "fast-flights"]);
+  });
+});
+
+describe("buildConfirmationOracle", () => {
+  const oracle = (env: NodeJS.ProcessEnv) =>
+    buildConfirmationOracle(loadConfig({ ...baseEnv, ...env }), createSilentLogger());
+
+  it("null sans DUFFEL_API_TOKEN (confirmation via les providers de recherche)", () => {
+    expect(oracle({})).toBeNull();
+  });
+
+  it("DuffelFlightProvider quand DUFFEL_API_TOKEN est défini", () => {
+    expect(oracle({ DUFFEL_API_TOKEN: "duffel_test_x" })?.name).toBe("duffel");
   });
 });

@@ -36,6 +36,16 @@ describe("loadConfig", () => {
     });
   });
 
+  it("structure providers.duffel (oracle de confirmation) depuis DUFFEL_API_TOKEN", () => {
+    expect(loadConfig({ ...baseEnv }).providers.duffel).toBeNull();
+    const cfg = loadConfig({ ...baseEnv, DUFFEL_API_TOKEN: "duffel_test_abc" });
+    expect(cfg.providers.duffel).toEqual({
+      token: "duffel_test_abc",
+      timeoutMs: 20_000,
+      maxDestinations: 4,
+    });
+  });
+
   it("structure providers.fastFlights depuis FAST_FLIGHTS_URL", () => {
     expect(loadConfig({ ...baseEnv }).providers.fastFlights).toBeNull();
     const cfg = loadConfig({

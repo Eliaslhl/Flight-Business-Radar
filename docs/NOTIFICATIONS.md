@@ -19,7 +19,7 @@
 - `matchAlerts(events, alerts)` : associe les événements aux alertes activées, **un seul match par alerte** (l'événement le plus fort — `FLASH_DROP` > `RECORD_LOW` > … > `DROP`).
 - `isInCooldown(alert, now)` / `cooldownRemainingSeconds(...)` : anti-spam par alerte.
 - `needsConfirmation(alertType)` : `FLASH_DROP` / `RECORD_LOW` / `UNUSUAL_PRICE`.
-- `isPriceConfirmed(targetEurCents, recheck, tolerance=0.03)` : `true` si la re-requête renvoie une offre **disponible** (`AVAILABLE`/`LOW`) sous le prix (± tolérance).
+- `isPriceConfirmed(targetEurCents, recheck, tolerance=0.03)` : `true` si la re-vérification renvoie une offre **disponible** (`AVAILABLE`/`LOW`) sous le prix (± tolérance). L'**oracle Duffel** (si `DUFFEL_API_TOKEN`) renvoie du contenu réservable → `AVAILABLE` ; les providers de scraping/SerpApi renvoient `UNKNOWN` → la confirmation ne peut aboutir que via l'oracle ou le `MockFlightProvider`. Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md).
 - `buildAlertNotification(match, ctx)` : sujet + corps FR + `dedupeKey` = `search:type:destination:outboundDate:jour`.
 
 ## `@fbr/notifications`
@@ -64,7 +64,8 @@ matchAlerts
   ├─ isInCooldown ?            → skip (log alert_cooldown)
   ├─ notificationExists(key) ? → SUPPRESSED (dédup, une par jour)
   ├─ needsConfirmation ?
-  │     └─ confirm(request)  (re-requête même provider, normalisée en EUR)
+  │     └─ confirm(request)  (oracle Duffel si DUFFEL_API_TOKEN — contenu réservable ;
+  │                           sinon / si échec Duffel : re-requête des providers de recherche)
   │          ├─ isPriceConfirmed → markPriceEventsConfirmed + snapshot CONFIRMED
   │          └─ sinon            → snapshot EXPIRED, PAS de notification (price_expired)
   │

@@ -7,4 +7,6 @@ export * from "./scraper-contract.js";
 export * from "./fast-flights-provider.js";
 export * from "./serpapi-contract.js";
 export * from "./serpapi-provider.js";
+export * from "./duffel-contract.js";
+export * from "./duffel-provider.js";
 export * from "./fixture-provider.js";
