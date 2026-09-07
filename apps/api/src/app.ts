@@ -4,6 +4,7 @@ import { pingDatabase, type DbHandle } from "@fbr/database";
 import { type Queue, type SearchRunJobData } from "@fbr/queue";
 import Fastify, { type FastifyError } from "fastify";
 import { registerAlertRoutes } from "./routes/alerts.js";
+import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerSearchRoutes } from "./routes/searches.js";
 import { type ApiInstance } from "./types.js";
 
@@ -69,6 +70,9 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
     });
     registerAlertRoutes(app, { db: db.db });
   }
+
+  // Config-only (aucun secret, aucune dépendance DB) — toujours disponible.
+  registerNotificationRoutes(app, { config });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof AppError) {

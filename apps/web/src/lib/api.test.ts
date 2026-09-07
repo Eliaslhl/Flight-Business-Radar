@@ -61,6 +61,20 @@ describe("api client", () => {
     }
   });
 
+  it("GET notificationChannels renvoie l'état des canaux", async () => {
+    const fn = mockFetch({
+      channels: [
+        { name: "CONSOLE", configured: true },
+        { name: "TELEGRAM", configured: false },
+      ],
+      timeoutMs: 10_000,
+      maxAttempts: 3,
+    });
+    const res = await api.notificationChannels();
+    expect(res.channels.map((c) => c.name)).toEqual(["CONSOLE", "TELEGRAM"]);
+    expect(fn).toHaveBeenCalledWith("/api/notifications/channels", expect.any(Object));
+  });
+
   it("listAlerts passe le filtre searchId", async () => {
     const fn = mockFetch({ alerts: [] });
     await api.listAlerts("s1");

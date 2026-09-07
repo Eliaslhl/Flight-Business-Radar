@@ -20,6 +20,10 @@
     "clean": "rimraf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@fbr/shared": "workspace:*"
+    "@fbr/shared": "workspace:*",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17"
   }
 }

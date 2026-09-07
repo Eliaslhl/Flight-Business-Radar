@@ -7,6 +7,11 @@ import { qk } from "@/lib/query-keys";
 
 export default function SettingsPage() {
   const health = useQuery({ queryKey: qk.health, queryFn: api.health, retry: false });
+  const channels = useQuery({
+    queryKey: qk.notificationChannels,
+    queryFn: api.notificationChannels,
+    retry: false,
+  });
 
   return (
     <div className="space-y-6">
@@ -34,6 +39,29 @@ export default function SettingsPage() {
             <code>/api/*</code> → API Fastify (rewrite Next)
           </dd>
         </dl>
+      </Card>
+
+      <Card>
+        <CardTitle>Notifications</CardTitle>
+        <p className="mb-3 text-sm text-[var(--color-muted)]">
+          Canaux actifs côté worker. Chacun s&apos;active quand sa config est renseignée dans{" "}
+          <code>.env</code> (voir <code>docs/NOTIFICATIONS.md</code>).
+        </p>
+        {channels.isLoading ? (
+          <p className="text-sm">…</p>
+        ) : channels.isError ? (
+          <Badge tone="danger">injoignable</Badge>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {channels.data?.channels.map((c) => (
+              <li key={c.name}>
+                <Badge tone={c.configured ? "ok" : "neutral"}>
+                  {c.name.toLowerCase()} {c.configured ? "✓" : "—"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card>

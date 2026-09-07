@@ -5,6 +5,7 @@ import type {
   CreateSearchInput,
   Health,
   Notification,
+  NotificationChannelsStatus,
   PriceEvent,
   PriceSnapshot,
   Search,
@@ -51,6 +52,7 @@ const post = (path: string, body?: unknown): Promise<unknown> =>
 
 export const api = {
   health: () => request<Health>("/health"),
+  notificationChannels: () => request<NotificationChannelsStatus>("/api/notifications/channels"),
 
   listSearches: () => request<{ searches: Search[] }>("/api/searches").then((r) => r.searches),
   getSearch: (id: string) => request<Search>(`/api/searches/${id}`),

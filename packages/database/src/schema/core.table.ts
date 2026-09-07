@@ -273,6 +273,7 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
   "TELEGRAM",
   "DISCORD",
   "PUSH",
+  "WEBHOOK",
 ]);
 
 export const notificationStatusEnum = pgEnum("notification_status", [

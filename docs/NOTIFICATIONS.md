@@ -25,8 +25,34 @@
 ## `@fbr/notifications`
 
 - `NotificationChannel` : `send(notification) → { channel, ok, error? }`. Implémenter Email / Telegram / Discord = ajouter une classe, **sans toucher au moteur de prix** (Phase 8).
-- `ConsoleChannel` : écrit dans les logs structurés (`notification_sent`).
-- `NotificationService.dispatch(n)` : diffuse sur tous les canaux (`Promise.allSettled`) — un canal en échec n'empêche pas les autres.
+- `NotificationService.dispatch(n)` : diffuse sur tous les canaux (`Promise.allSettled`) — un canal en échec n'empêche pas les autres, chaque résultat devient une ligne `notifications` (`SENT` / `FAILED`).
+
+### Canaux (Phase 8)
+
+| Canal      | Classe            | Transport                             | Config requise (`@fbr/config`)            |
+| ---------- | ----------------- | ------------------------------------- | ----------------------------------------- |
+| `CONSOLE`  | `ConsoleChannel`  | logs structurés (`notification_sent`) | — (toujours actif)                        |
+| `TELEGRAM` | `TelegramChannel` | API Bot `sendMessage` (`fetch`)       | `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` |
+| `EMAIL`    | `EmailChannel`    | SMTP via `nodemailer`                 | `SMTP_URL` + `EMAIL_FROM` + `EMAIL_TO`    |
+| `WEBHOOK`  | `WebhookChannel`  | `POST` JSON (`fetch`)                 | `NOTIFICATION_WEBHOOK_URL`                |
+
+- **Activation par présence de config** : le worker (`apps/worker/src/notifications.ts` → `buildNotificationService`) ajoute un canal **uniquement** si toute sa config est renseignée. `CONSOLE` est toujours là. Ajouter un canal = une classe `NotificationChannel` + une ligne dans ce factory — le moteur de prix n'est jamais touché (Phase 0 §16).
+- **Retry** : `withRetry` (backoff linéaire, `NOTIFICATION_MAX_ATTEMPTS`, défaut 3) enveloppe chaque canal réseau ; timeout dur par tentative (`NOTIFICATION_TIMEOUT_MS`, défaut 10 s). Un échec final n'est jamais propagé — il est historisé `FAILED` (pattern outbox).
+- **Payloads** :
+  - Telegram / Webhook : `sujet + corps` en texte ; le webhook émet aussi `content` (Discord), `text` (Slack / ntfy) et les champs structurés (`type`, `dedupeKey`, `payload`).
+  - Email : `text` = corps, `subject` = sujet, `from` / `to` = config.
+- **Secrets** : jamais committés — `TELEGRAM_BOT_TOKEN` / `SMTP_URL` sont des `optionalSecret` (`.env` local uniquement). L'URL webhook porte elle-même son jeton.
+- **Push mobile** : reporté (nécessite VAPID + service worker côté dashboard + persistance des souscriptions ; à reprendre avec une app mobile ou après la Phase 10). `WEBHOOK` couvre le besoin « push-like » en attendant (ntfy, Discord…).
+
+### Test manuel d'un canal (local, gratuit)
+
+```bash
+# Webhook : n'importe quel récepteur JSON (ici un mini serveur local)
+NOTIFICATION_WEBHOOK_URL=http://localhost:9099 pnpm --filter @fbr/worker dev
+# Email : MailHog en local
+docker run -d -p 1025:1025 -p 8025:8025 mailhog/mailhog
+SMTP_URL=smtp://localhost:1025 EMAIL_FROM=radar@localhost EMAIL_TO=me@localhost pnpm --filter @fbr/worker dev
+```
 
 ## Pipeline (`apps/worker/src/alert-pipeline.ts`)
 
@@ -51,7 +77,7 @@ matchAlerts
 ## Tables
 
 - `alerts` : `type`, `threshold_eur_cents`, `enabled`, `cooldown_seconds`, `last_triggered_at` ; index `(search_id, enabled)`.
-- `notifications` : `channel`, `status` (`PENDING`/`SENT`/`FAILED`/`SUPPRESSED`), `subject`, `body`, `payload`, `dedupe_key`, `sent_at`, `error` ; **unique `(dedupe_key, channel)`**.
+- `notifications` : `channel` (`CONSOLE`/`EMAIL`/`TELEGRAM`/`WEBHOOK`/`DISCORD`/`PUSH` — migration `0005` ajoute `WEBHOOK`), `status` (`PENDING`/`SENT`/`FAILED`/`SUPPRESSED`), `subject`, `body`, `payload`, `dedupe_key`, `sent_at`, `error` ; **unique `(dedupe_key, channel)`** (un même événement peut donc être notifié une fois par canal).
 
 ## API
 
@@ -62,3 +88,4 @@ matchAlerts
 | `POST /api/alerts/:id/enable` \| `/disable`     | Active / désactive                                                                             |
 | `DELETE /api/alerts/:id`                        | `204`                                                                                          |
 | `GET /api/searches/:id/notifications?limit=200` | Historique des notifications                                                                   |
+| `GET /api/notifications/channels`               | État des canaux (`{ name, configured }[]`) — **aucun secret**, sert au dashboard `/settings`   |

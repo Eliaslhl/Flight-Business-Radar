@@ -16,8 +16,8 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 | 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation                   | ✅ Terminée  |
 | 6     | Frontend : dashboard Next.js, graphiques, alertes                                                | ✅ Terminée  |
 | 7     | Real providers : sidecar Python `fast-flights` (fixture + live best-effort), `provider_requests` | ✅ Terminée  |
-| 8     | Notifications : email, Telegram, push                                                            | 🟢 Prochaine |
-| 9     | Smart recommendations : opportunity score, dates, Radar                                          | ⏳           |
+| 8     | Notifications : canaux Telegram / Email (SMTP) / Webhook, retry, auto-activation par config      | ✅ Terminée  |
+| 9     | Smart recommendations : opportunity score, dates, Radar                                          | 🟢 Prochaine |
 | 10    | AI Advisor                                                                                       | ⏳           |
 
 ## Prérequis
@@ -61,6 +61,23 @@ echo "FAST_FLIGHTS_URL=http://localhost:8000" >> .env    # puis relancer le work
 Modes du sidecar : `fixture` (défaut, fiable) / `live` (best-effort — voir
 [`docs/FLIGHT_PROVIDERS.md`](docs/FLIGHT_PROVIDERS.md)).
 
+### Notifications (optionnel, Phase 8)
+
+Le canal `console` (logs) est toujours actif. Chaque autre canal s'active dès que
+**toute** sa config est présente dans `.env` — aucun code à toucher :
+
+```bash
+# Telegram (gratuit) — bot via @BotFather + chat id
+TELEGRAM_BOT_TOKEN=…   TELEGRAM_CHAT_ID=…
+# Email — n'importe quel SMTP (MailHog en local : docker run -p 1025:1025 -p 8025:8025 mailhog/mailhog)
+SMTP_URL=smtp://localhost:1025   EMAIL_FROM=radar@localhost   EMAIL_TO=me@localhost
+# Webhook — Discord / Slack / ntfy / custom
+NOTIFICATION_WEBHOOK_URL=https://…
+```
+
+`GET /api/notifications/channels` indique les canaux actifs. Détails :
+[`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md).
+
 ## Structure
 
 ```
@@ -78,7 +95,7 @@ packages/
   analytics/        stats, tendance, dérivation des price_events (pur)
   fx/               taux de change + normalisation en EUR (pur)
   alerting/         matching alertes, cooldown, confirmation, messages (pur)
-  notifications/    NotificationChannel + ConsoleChannel + NotificationService
+  notifications/    NotificationService + canaux Console / Telegram / Email (SMTP) / Webhook + retry
   queue/            BullMQ + Redis (file `search`, worker)
   database/         schéma Drizzle + client postgres.js + migrations + repositories
 services/

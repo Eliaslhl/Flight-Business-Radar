@@ -7,10 +7,10 @@ import {
   type SearchJob,
 } from "@fbr/queue";
 import { DEFAULT_DROP_THRESHOLDS } from "@fbr/analytics";
-import { ConsoleChannel, NotificationService } from "@fbr/notifications";
 import { createLogger, LogEvent } from "@fbr/shared";
 import { buildConfirmer } from "./confirmer.js";
 import { buildFxService } from "./fx.js";
+import { buildNotificationService } from "./notifications.js";
 import { buildProviderRegistry } from "./providers.js";
 import { createScheduler } from "./scheduler.js";
 import { processSearchRun, type SearchProcessorDeps } from "./search-processor.js";
@@ -23,10 +23,7 @@ const connection = createQueueConnection(config.redis.url);
 const queue = createSearchQueue(connection);
 const registry = buildProviderRegistry(config, logger);
 const fx = buildFxService(config, db.db);
-const notificationService = new NotificationService({
-  channels: [new ConsoleChannel(logger)],
-  logger,
-});
+const notificationService = buildNotificationService(config, logger);
 
 const processorDeps: SearchProcessorDeps = {
   db: db.db,

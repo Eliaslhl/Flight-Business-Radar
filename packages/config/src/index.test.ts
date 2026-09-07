@@ -70,6 +70,41 @@ describe("loadConfig", () => {
     expect(cfg.notifications.telegram).toBeNull();
   });
 
+  it("structure les canaux de notification quand leur config est complète", () => {
+    const base = loadConfig({ ...baseEnv });
+    expect(base.notifications).toEqual({
+      telegram: null,
+      email: null,
+      webhook: null,
+      timeoutMs: 10_000,
+      maxAttempts: 3,
+    });
+
+    const cfg = loadConfig({
+      ...baseEnv,
+      TELEGRAM_BOT_TOKEN: "bot-123",
+      TELEGRAM_CHAT_ID: "-100999",
+      SMTP_URL: "smtp://user:pass@localhost:1025",
+      EMAIL_FROM: "radar@localhost",
+      EMAIL_TO: "me@localhost",
+      NOTIFICATION_WEBHOOK_URL: "https://hooks.example.com/abc",
+      NOTIFICATION_TIMEOUT_MS: "5000",
+    });
+    expect(cfg.notifications.telegram).toEqual({ botToken: "bot-123", chatId: "-100999" });
+    expect(cfg.notifications.email).toEqual({
+      smtpUrl: "smtp://user:pass@localhost:1025",
+      from: "radar@localhost",
+      to: "me@localhost",
+    });
+    expect(cfg.notifications.webhook).toEqual({ url: "https://hooks.example.com/abc" });
+    expect(cfg.notifications.timeoutMs).toBe(5000);
+  });
+
+  it("laisse un canal inactif si sa config est incomplète (token sans chat id)", () => {
+    const cfg = loadConfig({ ...baseEnv, TELEGRAM_BOT_TOKEN: "bot-123" });
+    expect(cfg.notifications.telegram).toBeNull();
+  });
+
   it("expose la config du moteur de recherche avec ses défauts", () => {
     const cfg = loadConfig({ ...baseEnv });
     expect(cfg.engine).toEqual({

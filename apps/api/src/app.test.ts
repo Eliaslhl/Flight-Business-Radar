@@ -37,4 +37,14 @@ describe("api /health", () => {
     const res = await app.inject({ method: "GET", url: "/nope" });
     expect(res.statusCode).toBe(404);
   });
+
+  it("GET /api/notifications/channels liste les canaux sans exposer de secret", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/notifications/channels" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ channels: { name: string; configured: boolean }[] }>();
+    expect(body.channels.map((c) => c.name)).toEqual(["CONSOLE", "TELEGRAM", "EMAIL", "WEBHOOK"]);
+    expect(body.channels.find((c) => c.name === "CONSOLE")?.configured).toBe(true);
+    expect(body.channels.find((c) => c.name === "TELEGRAM")?.configured).toBe(false);
+    expect(JSON.stringify(body)).not.toMatch(/token|smtp|password|secret/i);
+  });
 });

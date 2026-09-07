@@ -85,6 +85,12 @@ Journal des appels providers émis par le worker pour cette recherche (succès *
 `{ id, provider, ok, offerCount, latencyMs, errorCode, errorMessage, createdAt }`.
 `provider` filtre optionnel (`fast-flights`, `mock`, …). Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md).
 
+### `GET /api/notifications/channels` → `{ channels, timeoutMs, maxAttempts }`
+
+État des canaux de notification configurés côté worker (Phase 8) — **aucun secret exposé** :
+`channels: { name: "CONSOLE" | "TELEGRAM" | "EMAIL" | "WEBHOOK", configured: boolean }[]`.
+`CONSOLE` est toujours `configured`. Sert au dashboard `/settings`. Voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
+
 ## Alertes
 
 | Route                                                                                     | Réponse                                                      |

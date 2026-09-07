@@ -17,13 +17,13 @@ donc nécessaire côté API.
 
 ## Pages
 
-| Route            | Contenu                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                        |
-| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                |
-| `/searches/[id]` | Résumé analytics, **graphique prix/temps**, prix moyen par mois, événements, alertes, notifications, vols observés |
-| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                              |
-| `/settings`      | État de l'API, devise de référence, compte (dev)                                                                   |
+| Route            | Contenu                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `/dashboard`     | Cartes de recherche (meilleur prix, cible, priorité) + flux « Dernières baisses détectées »                         |
+| `/searches`      | Tableau + formulaire de création + actions (analyser / activer / pause / supprimer)                                 |
+| `/searches/[id]` | Résumé analytics, **graphique prix/temps**, prix moyen par mois, événements, alertes, notifications, vols observés  |
+| `/alerts`        | Toutes les alertes (activer / désactiver / supprimer)                                                               |
+| `/settings`      | État de l'API, **canaux de notification actifs** (`/api/notifications/channels`), devise de référence, compte (dev) |
 
 `/destinations` et une vue globale des vols sont reportées : le mode Radar est Phase 9 et
 l'API n'expose pas d'agrégat inter-recherches.
