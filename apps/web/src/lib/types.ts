@@ -26,6 +26,7 @@ export interface Search {
   excludedAirlines: string[];
   status: SearchStatus;
   priority: SearchPriority;
+  priorityLocked: boolean;
   intervalSeconds: number;
   nextRunAt: string;
   lastRunAt: string | null;

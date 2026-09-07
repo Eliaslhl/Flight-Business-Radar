@@ -86,11 +86,40 @@ suite("API /api/searches (intégration Postgres)", () => {
     expect(res.json<{ error: string }>().error).toBe("VALIDATION_FAILED");
   });
 
-  it("POST /run répond 503 quand la file n'est pas branchée", async () => {
+  it("POST /run sans file : avance l'échéance (traité au prochain passage du cron)", async () => {
     const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
     const { id } = created.json<{ id: string }>();
     const run = await app.inject({ method: "POST", url: `/api/searches/${id}/run` });
-    expect(run.statusCode).toBe(503);
+    expect(run.statusCode).toBe(202);
+    expect(run.json<{ enqueued: boolean; scheduled: boolean }>()).toEqual({
+      enqueued: false,
+      scheduled: true,
+    });
+    const fresh = await app.inject({ method: "GET", url: `/api/searches/${id}` });
+    expect(new Date(fresh.json<{ nextRunAt: string }>().nextRunAt).getTime()).toBeLessThanOrEqual(
+      Date.now() + 1000,
+    );
+  });
+
+  it("POST /priority fixe la priorité et la verrouille", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/searches", payload: validBody });
+    const { id } = created.json<{ id: string }>();
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/searches/${id}/priority`,
+      payload: { priority: "HIGH" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ priority: string; priorityLocked: boolean }>()).toMatchObject({
+      priority: "HIGH",
+      priorityLocked: true,
+    });
+    const bad = await app.inject({
+      method: "POST",
+      url: `/api/searches/${id}/priority`,
+      payload: { priority: "URGENT" },
+    });
+    expect(bad.statusCode).toBe(400);
   });
 
   it("/analytics agrège les observations et /events part vide", async () => {

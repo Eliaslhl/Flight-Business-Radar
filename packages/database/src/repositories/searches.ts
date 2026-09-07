@@ -1,4 +1,4 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { type Database } from "../client.js";
 import { searches, type NewSearchRow, type SearchRow } from "../schema/core.table.js";
 
@@ -65,6 +65,20 @@ export const getSearch = async (db: Database, id: string): Promise<SearchRow | u
   return row;
 };
 
+/** Fixe la priorité manuellement (verrouille le recalcul adaptatif du worker). */
+export const setSearchPriority = async (
+  db: Database,
+  id: string,
+  priority: SearchPriority,
+): Promise<SearchRow | undefined> => {
+  const [row] = await db
+    .update(searches)
+    .set({ priority, priorityLocked: true })
+    .where(eq(searches.id, id))
+    .returning();
+  return row;
+};
+
 export const deleteSearch = async (db: Database, id: string): Promise<boolean> => {
   const deleted = await db
     .delete(searches)
@@ -82,13 +96,20 @@ export const setSearchStatus = async (
   return row;
 };
 
-/** Recherches actives dont l'échéance est atteinte (pour le scheduler). */
+/**
+ * Recherches actives dont l'échéance est atteinte (pour le scheduler).
+ * Ordre : priorité (HIGH d'abord) puis `next_run_at` — quand le lot est plafonné,
+ * les recherches prioritaires passent en premier.
+ */
 export const listDueSearches = async (db: Database, now: Date, limit = 50): Promise<SearchRow[]> =>
   db
     .select()
     .from(searches)
     .where(and(eq(searches.status, "ACTIVE"), lte(searches.nextRunAt, now)))
-    .orderBy(asc(searches.nextRunAt))
+    .orderBy(
+      sql`case ${searches.priority} when 'HIGH' then 0 when 'MEDIUM' then 1 else 2 end`,
+      asc(searches.nextRunAt),
+    )
     .limit(limit);
 
 export interface ScheduleUpdate {

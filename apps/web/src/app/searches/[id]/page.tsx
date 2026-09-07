@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { EventBadge, PriorityBadge, StatusBadge } from "@/components/badges";
+import { EventBadge, StatusBadge } from "@/components/badges";
 import { AlertsPanel } from "@/components/alerts-panel";
 import { CABIN_LABEL } from "@/components/create-search-form";
 import { MonthlyChart } from "@/components/monthly-chart";
 import { PriceChart } from "@/components/price-chart";
+import { useToast } from "@/components/toast";
 import {
   Badge,
   Button,
@@ -15,6 +16,7 @@ import {
   CardTitle,
   EmptyState,
   ErrorState,
+  Select,
   Spinner,
   Stat,
 } from "@/components/ui";
@@ -29,7 +31,18 @@ import {
   relativeTime,
 } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import type { AdviceAction, OpportunityBand, RecommendationReport } from "@/lib/types";
+import type {
+  AdviceAction,
+  OpportunityBand,
+  RecommendationReport,
+  SearchPriority,
+} from "@/lib/types";
+
+const PRIORITY_LABEL: Record<SearchPriority, string> = {
+  HIGH: "Élevée",
+  MEDIUM: "Moyenne",
+  LOW: "Basse",
+};
 
 const ADVICE_LABEL: Record<AdviceAction, string> = {
   COLLECTE: "Encore trop tôt",
@@ -49,6 +62,7 @@ const ADVICE_TONE: Record<AdviceAction, "ok" | "accent" | "warn" | "neutral"> = 
 export default function SearchDetailPage() {
   const id = String(useParams().id);
   const qc = useQueryClient();
+  const toast = useToast();
 
   const search = useQuery({ queryKey: qk.search(id), queryFn: () => api.getSearch(id) });
   const flights = useQuery({ queryKey: qk.flights(id), queryFn: () => api.flights(id) });
@@ -72,21 +86,36 @@ export default function SearchDetailPage() {
   const flagOf = (iata: string): string =>
     flagEmoji(airports.data?.find((a) => a.iata === iata)?.countryCode);
 
+  const invalidateAll = () => {
+    for (const key of [
+      qk.search(id),
+      qk.flights(id),
+      qk.prices(id),
+      qk.analytics(id),
+      qk.recommendations(id),
+      qk.advice(id),
+      qk.events(id),
+      qk.notifications(id),
+    ]) {
+      void qc.invalidateQueries({ queryKey: key });
+    }
+  };
   const run = useMutation({
     mutationFn: () => api.runSearch(id),
+    onSuccess: (r) => {
+      invalidateAll();
+      toast(
+        r.scheduled ? "Analyse programmée (prochain passage ≤ 15 min)" : "Analyse lancée ✓",
+        "ok",
+      );
+    },
+    onError: () => toast("Analyse impossible — réessaie", "error"),
+  });
+  const setPriority = useMutation({
+    mutationFn: (priority: SearchPriority) => api.setPriority(id, priority),
     onSuccess: () => {
-      for (const key of [
-        qk.search(id),
-        qk.flights(id),
-        qk.prices(id),
-        qk.analytics(id),
-        qk.recommendations(id),
-        qk.advice(id),
-        qk.events(id),
-        qk.notifications(id),
-      ]) {
-        void qc.invalidateQueries({ queryKey: key });
-      }
+      void qc.invalidateQueries({ queryKey: qk.search(id) });
+      toast("Priorité mise à jour ✓", "ok");
     },
   });
 
@@ -111,13 +140,26 @@ export default function SearchDetailPage() {
               {s.destinations.length === 0
                 ? "toutes destinations"
                 : s.destinations.map((d) => `${flagOf(d)} ${d}`).join(", ")}{" "}
-              · {CABIN_LABEL[s.cabinClass]} · {formatDate(s.departureWindow.start, true)}–
+              · toutes cabines · {formatDate(s.departureWindow.start, true)}–
               {formatDate(s.departureWindow.end, true)} · {s.tripDuration.minDays}–
               {s.tripDuration.maxDays} j · ≤ {s.maxStops} escale(s)
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge status={s.status} />
-              <PriorityBadge priority={s.priority} />
+              <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
+                Priorité
+                <Select
+                  className="h-7 w-24 py-0 text-xs"
+                  value={s.priority}
+                  onChange={(e) => setPriority.mutate(e.target.value as SearchPriority)}
+                >
+                  {(["HIGH", "MEDIUM", "LOW"] as const).map((p) => (
+                    <option key={p} value={p}>
+                      {PRIORITY_LABEL[p]}
+                    </option>
+                  ))}
+                </Select>
+              </label>
               {s.targetPriceCents !== null ? (
                 <Badge tone="accent">cible {formatEur(s.targetPriceCents)}</Badge>
               ) : null}
@@ -306,6 +348,7 @@ export default function SearchDetailPage() {
             <thead className="border-b border-[var(--color-border)] text-left text-[var(--color-muted)]">
               <tr>
                 <th className="px-5 py-3 font-medium">Trajet</th>
+                <th className="px-5 py-3 font-medium">Cabine</th>
                 <th className="px-5 py-3 font-medium">Dates</th>
                 <th className="px-5 py-3 font-medium">Compagnie</th>
                 <th className="px-5 py-3 font-medium">Escales</th>
@@ -314,23 +357,28 @@ export default function SearchDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
-              {(flights.data ?? []).map((f) => (
-                <tr key={f.fingerprint}>
-                  <td className="px-5 py-3 whitespace-nowrap">
-                    {flagOf(f.origin)} {f.origin} → {flagOf(f.destination)} {f.destination}
-                  </td>
-                  <td className="px-5 py-3 text-[var(--color-muted)]">
-                    {formatDate(f.outboundDate, true)}
-                    {f.returnDate ? ` → ${formatDate(f.returnDate, true)}` : ""}
-                  </td>
-                  <td className="px-5 py-3">{f.marketingAirline ?? "—"}</td>
-                  <td className="px-5 py-3">{f.maxStops}</td>
-                  <td className="px-5 py-3 font-medium">{formatEur(f.latestPriceCents)}</td>
-                  <td className="px-5 py-3 text-[var(--color-muted)]">
-                    {relativeTime(f.observedAt)}
-                  </td>
-                </tr>
-              ))}
+              {[...(flights.data ?? [])]
+                .sort((x, y) => x.latestPriceCents - y.latestPriceCents)
+                .map((f, i) => (
+                  <tr key={f.fingerprint} className={i < 3 ? "bg-[var(--color-ok-soft)]/40" : ""}>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {flagOf(f.origin)} {f.origin} → {flagOf(f.destination)} {f.destination}
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tone="neutral">{CABIN_LABEL[f.cabinClass]}</Badge>
+                    </td>
+                    <td className="px-5 py-3 text-[var(--color-muted)]">
+                      {formatDate(f.outboundDate, true)}
+                      {f.returnDate ? ` → ${formatDate(f.returnDate, true)}` : ""}
+                    </td>
+                    <td className="px-5 py-3">{f.marketingAirline ?? "—"}</td>
+                    <td className="px-5 py-3">{f.maxStops}</td>
+                    <td className="px-5 py-3 font-medium">{formatEur(f.latestPriceCents)}</td>
+                    <td className="px-5 py-3 text-[var(--color-muted)]">
+                      {relativeTime(f.observedAt)}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         )}

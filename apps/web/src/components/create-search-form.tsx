@@ -3,13 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AirportInput } from "./airport-input";
-import { Button, Card, Field, Input, Select } from "./ui";
+import { useToast } from "./toast";
+import { Button, Card, Field, Input } from "./ui";
 import { flagEmoji } from "@/lib/flags";
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/query-keys";
 import type { CabinClass, CreateSearchInput } from "@/lib/types";
 
-const CABINS: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
+/** Libellés FR — l'app ne filtre plus par cabine (on affiche les 3 moins chères). */
 export const CABIN_LABEL: Record<CabinClass, string> = {
   ECONOMY: "Économie",
   PREMIUM_ECONOMY: "Économie premium",
@@ -23,10 +24,10 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   const airports = useQuery({ queryKey: qk.airports, queryFn: api.airports });
   const list = airports.data ?? [];
 
+  const toast = useToast();
   const [form, setForm] = useState({
     label: "",
     origin: "CDG",
-    cabinClass: "ECONOMY" as CabinClass,
     start: "",
     end: "",
     minDays: "10",
@@ -52,8 +53,10 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     mutationFn: (body: CreateSearchInput) => api.createSearch(body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.searches });
+      toast("Recherche créée ✓", "ok");
       onCreated?.();
     },
+    onError: () => toast("Création impossible — réessaie", "error"),
   });
 
   const submit = (e: React.FormEvent) => {
@@ -61,7 +64,8 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     const body: CreateSearchInput = {
       origin: form.origin.trim().toUpperCase(),
       destinations: dests,
-      cabinClass: form.cabinClass,
+      // Plus de choix de cabine : le worker remonte les 3 moins chères, cabine mélangée.
+      cabinClass: "ECONOMY",
       departureWindow: { start: form.start, end: form.end },
       tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
       maxStops: Number(form.maxStops),
@@ -124,15 +128,6 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
           />
         </div>
 
-        <Field label="Classe">
-          <Select value={form.cabinClass} onChange={set("cabinClass")}>
-            {CABINS.map((c) => (
-              <option key={c} value={c}>
-                {CABIN_LABEL[c]}
-              </option>
-            ))}
-          </Select>
-        </Field>
         <Field label="Escales max">
           <Input type="number" min={0} max={4} value={form.maxStops} onChange={set("maxStops")} />
         </Field>

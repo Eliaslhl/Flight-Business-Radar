@@ -20,7 +20,11 @@ import { qk } from "@/lib/query-keys";
 import type { PriceEvent } from "@/lib/types";
 
 export default function DashboardPage() {
-  const searches = useQuery({ queryKey: qk.searches, queryFn: api.listSearches });
+  const searches = useQuery({
+    queryKey: qk.searches,
+    queryFn: api.listSearches,
+    refetchInterval: 60_000,
+  });
   const rows = searches.data ?? [];
 
   const eventQueries = useQueries({
