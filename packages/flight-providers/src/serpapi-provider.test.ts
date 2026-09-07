@@ -163,6 +163,10 @@ describe("SerpApiFlightProvider", () => {
     expect(af.inbound?.departureDate).toBe("2026-11-22"); // retour synthétisé
     expect(af.inbound?.marketingAirline).toBe("AF");
     expect(af.fingerprint).toMatch(/^fbr_/);
+    // lien Google Flights pré-rempli (route + dates), pas de crédit consommé
+    expect(af.bookingUrl).toContain("google.com/travel/flights");
+    expect(af.bookingUrl).toContain("CDG");
+    expect(af.bookingUrl).toContain("HND");
 
     const lh = offers[1]!;
     expect(lh.outbound.marketingAirline).toBe("LH");

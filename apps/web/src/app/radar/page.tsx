@@ -202,58 +202,102 @@ function RankingTable({
   searchId: string;
   seed: SeedAirport[];
 }) {
-  const byIata = new Map(seed.map((a) => [a.iata, a]));
+  const byIata = useMemo(() => new Map(seed.map((a) => [a.iata, a])), [seed]);
+  const [country, setCountry] = useState<string>("ALL");
+
+  // Regroupe par pays : le vol le moins cher de chaque pays + le détail des aéroports.
+  const byCountry = useMemo(() => {
+    const map = new Map<string, { country: string; code: string; ranks: RadarDestinationRank[] }>();
+    for (const r of rows) {
+      const a = byIata.get(r.destination);
+      const key = a?.country ?? r.destination;
+      const entry = map.get(key) ?? { country: key, code: a?.countryCode ?? "", ranks: [] };
+      entry.ranks.push(r);
+      map.set(key, entry);
+    }
+    return [...map.values()]
+      .map((e) => ({
+        ...e,
+        ranks: [...e.ranks].sort((x, y) => x.latestPriceEurCents - y.latestPriceEurCents),
+        best: Math.min(...e.ranks.map((r) => r.latestPriceEurCents)),
+      }))
+      .sort((x, y) => x.best - y.best);
+  }, [rows, byIata]);
+
+  const countries = byCountry.map((c) => c.country);
+  const shown = country === "ALL" ? byCountry : byCountry.filter((c) => c.country === country);
+
   return (
-    <div className="-mx-5 overflow-x-auto">
-      <table className="w-full min-w-[36rem] text-sm">
-        <thead className="border-y border-[var(--color-border)] text-left text-xs text-[var(--color-muted)]">
-          <tr>
-            <th className="px-5 py-2 font-medium">#</th>
-            <th className="px-5 py-2 font-medium">Destination</th>
-            <th className="px-5 py-2 font-medium">Prix récent</th>
-            <th className="px-5 py-2 font-medium">Min observé</th>
-            <th className="px-5 py-2 font-medium">Meilleure date</th>
-            <th className="px-5 py-2 font-medium">Données</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--color-border)]">
-          {rows.map((r, i) => (
-            <tr key={r.destination} className="hover:bg-[var(--color-surface-2)]">
-              <td className="px-5 py-2.5 text-[var(--color-faint)]">{i + 1}</td>
-              <td className="px-5 py-2.5">
-                <Link
-                  href={`/searches/${searchId}`}
-                  className="inline-flex items-center gap-1.5 font-medium hover:text-[var(--color-accent)]"
-                >
-                  <span aria-hidden>
-                    {flagEmoji(byIata.get(r.destination)?.countryCode) || "🏳️"}
-                  </span>
-                  <span className="font-mono">{r.destination}</span>
-                  {byIata.get(r.destination) ? (
-                    <span className="text-[var(--color-muted)]">
-                      {byIata.get(r.destination)!.city}
-                    </span>
-                  ) : null}
-                </Link>
-              </td>
-              <td className="tnum px-5 py-2.5 font-medium">{formatEur(r.latestPriceEurCents)}</td>
-              <td className="tnum px-5 py-2.5 text-[var(--color-muted)]">
-                {formatEur(r.minPriceEurCents)}
-              </td>
-              <td className="px-5 py-2.5 text-[var(--color-muted)]">
-                {formatDate(r.bestOutboundDate, true)}
-              </td>
-              <td className="px-5 py-2.5">
-                {r.reliable ? (
-                  <Badge tone="ok">fiable</Badge>
-                ) : (
-                  <Badge tone="neutral">{r.sampleSize} obs.</Badge>
-                )}
-              </td>
-            </tr>
+    <div>
+      <div className="mb-3">
+        <Select className="max-w-xs" value={country} onChange={(e) => setCountry(e.target.value)}>
+          <option value="ALL">Tous les pays ({countries.length})</option>
+          {countries.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
-        </tbody>
-      </table>
+        </Select>
+      </div>
+      <div className="-mx-5 overflow-x-auto">
+        <table className="w-full min-w-[36rem] text-sm">
+          <thead className="border-y border-[var(--color-border)] text-left text-xs text-[var(--color-muted)]">
+            <tr>
+              <th className="px-5 py-2 font-medium">#</th>
+              <th className="px-5 py-2 font-medium">Pays / ville</th>
+              <th className="px-5 py-2 font-medium">Prix récent</th>
+              <th className="px-5 py-2 font-medium">Min observé</th>
+              <th className="px-5 py-2 font-medium">Meilleure date</th>
+              <th className="px-5 py-2 font-medium">Données</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--color-border)]">
+            {shown.flatMap((c, ci) =>
+              c.ranks.map((r, ri) => {
+                const a = byIata.get(r.destination);
+                return (
+                  <tr key={r.destination} className="hover:bg-[var(--color-surface-2)]">
+                    <td className="px-5 py-2.5 text-[var(--color-faint)]">
+                      {ri === 0 ? ci + 1 : ""}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <Link
+                        href={`/searches/${searchId}`}
+                        className="inline-flex items-center gap-1.5 hover:text-[var(--color-accent)]"
+                      >
+                        <span aria-hidden>{flagEmoji(c.code) || "🏳️"}</span>
+                        {ri === 0 ? (
+                          <span className="font-medium">{c.country}</span>
+                        ) : (
+                          <span className="pl-4 text-[var(--color-muted)]">↳</span>
+                        )}
+                        <span className="font-mono text-[var(--color-muted)]">{r.destination}</span>
+                        {a ? <span className="text-[var(--color-muted)]">{a.city}</span> : null}
+                      </Link>
+                    </td>
+                    <td className="tnum px-5 py-2.5 font-medium">
+                      {formatEur(r.latestPriceEurCents)}
+                    </td>
+                    <td className="tnum px-5 py-2.5 text-[var(--color-muted)]">
+                      {formatEur(r.minPriceEurCents)}
+                    </td>
+                    <td className="px-5 py-2.5 text-[var(--color-muted)]">
+                      {formatDate(r.bestOutboundDate, true)}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      {r.reliable ? (
+                        <Badge tone="ok">fiable</Badge>
+                      ) : (
+                        <Badge tone="neutral">{r.sampleSize} obs.</Badge>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }),
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -271,10 +315,8 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
   const [form, setForm] = useState({
     origin: "CDG",
     continent: "ALL",
-    start: "",
-    end: "",
-    minDays: "7",
-    maxDays: "14",
+    depart: "",
+    retour: "",
   });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -285,6 +327,10 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
       const dests = region
         ? (seed.data?.destinations ?? []).filter((d) => d.region === region).map((d) => d.iata)
         : [];
+      const nights = Math.max(
+        1,
+        Math.round((Date.parse(form.retour) - Date.parse(form.depart)) / 86_400_000) || 1,
+      );
       const body: CreateSearchInput = {
         label: `Radar ${form.origin.toUpperCase()}${
           region ? ` · ${REGION_LABEL[region] ?? region}` : ""
@@ -292,8 +338,8 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
         origin: form.origin.trim().toUpperCase(),
         destinations: dests,
         cabinClass: "ECONOMY",
-        departureWindow: { start: form.start, end: form.end },
-        tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
+        departureWindow: { start: form.depart, end: form.depart },
+        tripDuration: { minDays: nights, maxDays: nights },
       };
       const created = await api.createSearch(body);
       await api.activateSearch(created.id);
@@ -338,33 +384,27 @@ function CreateRadarCard({ onCreated }: { onCreated: () => void }) {
             ))}
           </Select>
         </Field>
-        <Field label="Durée min (j)">
-          <Input type="number" min={1} value={form.minDays} onChange={set("minDays")} />
-        </Field>
-        <Field label="Durée max (j)">
-          <Input type="number" min={1} value={form.maxDays} onChange={set("maxDays")} />
-        </Field>
-        <Field label="Fenêtre — début">
+        <Field label="Date aller">
           <Input
             type="date"
             min={new Date().toISOString().slice(0, 10)}
-            value={form.start}
+            value={form.depart}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
-                start: e.target.value,
-                end: f.end && f.end < e.target.value ? e.target.value : f.end,
+                depart: e.target.value,
+                retour: f.retour && f.retour <= e.target.value ? "" : f.retour,
               }))
             }
             required
           />
         </Field>
-        <Field label="Fenêtre — fin">
+        <Field label="Date retour">
           <Input
             type="date"
-            min={form.start || new Date().toISOString().slice(0, 10)}
-            value={form.end}
-            onChange={set("end")}
+            min={form.depart || new Date().toISOString().slice(0, 10)}
+            value={form.retour}
+            onChange={set("retour")}
             required
           />
         </Field>

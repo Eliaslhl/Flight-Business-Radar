@@ -47,6 +47,7 @@ export interface SearchFlight {
   latestPriceCents: number;
   currency: string;
   availability: Availability;
+  bookingUrl: string | null;
   observedAt: string;
 }
 

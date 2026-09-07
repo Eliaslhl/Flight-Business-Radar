@@ -93,7 +93,7 @@ export default function SearchesPage() {
             <thead className="border-b border-[var(--color-border)] text-left text-[var(--color-muted)]">
               <tr>
                 <th className="px-4 py-3 font-medium">Recherche</th>
-                <th className="px-4 py-3 font-medium">Fenêtre</th>
+                <th className="px-4 py-3 font-medium">Dates</th>
                 <th className="px-4 py-3 font-medium">Cible</th>
                 <th className="px-4 py-3 font-medium">Statut</th>
                 <th className="px-4 py-3 font-medium">Prochaine analyse</th>
@@ -128,10 +128,17 @@ export default function SearchesPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--color-muted)]">
-                    {formatDate(s.departureWindow.start, true)} –{" "}
-                    {formatDate(s.departureWindow.end, true)}
+                    {formatDate(s.departureWindow.start, true)}
                     <div>
-                      {s.tripDuration.minDays}–{s.tripDuration.maxDays} j
+                      retour{" "}
+                      {formatDate(
+                        new Date(
+                          Date.parse(s.departureWindow.start) + s.tripDuration.minDays * 86_400_000,
+                        )
+                          .toISOString()
+                          .slice(0, 10),
+                        true,
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">{formatEur(s.targetPriceCents)}</td>

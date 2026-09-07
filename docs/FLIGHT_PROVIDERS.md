@@ -209,6 +209,7 @@ taguées de leur cabine ; l'analyse garde les 3 moins chères, cabine mélangée
 - `HTTP 429` (quota) / `HTTP 401` (clé) → `ProviderError` **non-retryable** ;
   `HTTP 5xx` → retryable ; timeout / réseau → `PROVIDER_TIMEOUT`.
 - Consommation à surveiller via `provider_requests` (`provider = "serpapi"`).
+- `bookingUrl` = lien **Google Flights pré-rempli** (route + dates) — pas un lien de réservation direct (ça coûterait un crédit par offre). Exposé par `GET /api/searches/:id/flights` (`bookingUrl`), affiché « Réserver ↗ » dans la table des vols.
 
 ### Conversion
 

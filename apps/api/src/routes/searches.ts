@@ -230,6 +230,7 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
         latestPriceCents: f.latestPriceCents,
         currency: f.currency,
         availability: f.availability,
+        bookingUrl: (f.offer.payload as { bookingUrl?: string }).bookingUrl ?? null,
         observedAt: f.observedAt.toISOString(),
         offer: f.offer.payload,
       })),

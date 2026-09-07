@@ -140,9 +140,14 @@ export default function SearchDetailPage() {
               {s.destinations.length === 0
                 ? "toutes destinations"
                 : s.destinations.map((d) => `${flagOf(d)} ${d}`).join(", ")}{" "}
-              · toutes cabines · {formatDate(s.departureWindow.start, true)}–
-              {formatDate(s.departureWindow.end, true)} · {s.tripDuration.minDays}–
-              {s.tripDuration.maxDays} j · ≤ {s.maxStops} escale(s)
+              · toutes cabines · aller {formatDate(s.departureWindow.start, true)} · retour{" "}
+              {formatDate(
+                new Date(Date.parse(s.departureWindow.start) + s.tripDuration.minDays * 86_400_000)
+                  .toISOString()
+                  .slice(0, 10),
+                true,
+              )}{" "}
+              · ≤ {s.maxStops} escale(s)
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge status={s.status} />
@@ -354,6 +359,7 @@ export default function SearchDetailPage() {
                 <th className="px-5 py-3 font-medium">Escales</th>
                 <th className="px-5 py-3 font-medium">Prix</th>
                 <th className="px-5 py-3 font-medium">Vu</th>
+                <th className="px-5 py-3 font-medium" />
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
@@ -376,6 +382,18 @@ export default function SearchDetailPage() {
                     <td className="px-5 py-3 font-medium">{formatEur(f.latestPriceCents)}</td>
                     <td className="px-5 py-3 text-[var(--color-muted)]">
                       {relativeTime(f.observedAt)}
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {f.bookingUrl ? (
+                        <a
+                          href={f.bookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--color-accent)] hover:underline"
+                        >
+                          Réserver ↗
+                        </a>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
