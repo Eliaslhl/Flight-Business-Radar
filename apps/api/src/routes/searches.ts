@@ -12,7 +12,6 @@ import {
   replaceCombinations,
   setSearchStatus,
   updateSearchSchedule,
-  DEV_USER_ID,
   type Database,
   type SearchRow,
 } from "@fbr/database";
@@ -34,6 +33,8 @@ import {
 import { enqueueSearchRun, type Queue, type SearchRunJobData } from "@fbr/queue";
 import { generateDateCombinations } from "@fbr/search-engine";
 import { type Logger } from "@fbr/shared";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { requireUser } from "../auth.js";
 import { createSearchBodySchema } from "../schemas.js";
 import { type ApiInstance } from "../types.js";
 
@@ -78,7 +79,25 @@ const toDto = (row: SearchRow) => ({
 export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): void => {
   const { db } = deps;
 
+  /** Charge une recherche appartenant à l'utilisateur courant, sinon 404 (déjà envoyé). */
+  const loadOwned = async (
+    id: string,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<SearchRow | null> => {
+    const uid = requireUser(request, reply);
+    if (!uid) return null;
+    const row = await getSearch(db, id);
+    if (row?.userId !== uid) {
+      void reply.code(404).send({ error: "NOT_FOUND" });
+      return null;
+    }
+    return row;
+  };
+
   app.post("/api/searches", async (request, reply) => {
+    const uid = requireUser(request, reply);
+    if (!uid) return reply;
     const parsed = createSearchBodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -88,7 +107,7 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
     }
     const body = parsed.data;
     const created = await createSearch(db, {
-      userId: DEV_USER_ID,
+      userId: uid,
       label: body.label ?? null,
       origin: body.origin,
       destinations: body.destinations,
@@ -126,26 +145,30 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
     return reply.code(201).send({ ...toDto(created), dateCombinations: combos.length });
   });
 
-  app.get("/api/searches", async () => {
-    const rows = await listSearches(db, { userId: DEV_USER_ID });
+  app.get("/api/searches", async (request, reply) => {
+    const uid = requireUser(request, reply);
+    if (!uid) return reply;
+    const rows = await listSearches(db, { userId: uid });
     return { searches: rows.map(toDto) };
   });
 
   app.get("/api/searches/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     return toDto(row);
   });
 
   app.delete("/api/searches/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const ok = await deleteSearch(db, id);
-    return ok ? reply.code(204).send() : reply.code(404).send({ error: "NOT_FOUND" });
+    if (!(await loadOwned(id, request, reply))) return reply;
+    await deleteSearch(db, id);
+    return reply.code(204).send();
   });
 
   app.post("/api/searches/:id/activate", async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!(await loadOwned(id, request, reply))) return reply;
     const row = await setSearchStatus(db, id, "ACTIVE");
     if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
     await updateSearchSchedule(db, id, { nextRunAt: new Date() });
@@ -155,6 +178,7 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.post("/api/searches/:id/pause", async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!(await loadOwned(id, request, reply))) return reply;
     const row = await setSearchStatus(db, id, "PAUSED");
     if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
     return toDto(row);
@@ -162,8 +186,7 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.post("/api/searches/:id/run", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    if (!(await loadOwned(id, request, reply))) return reply;
     if (!deps.queue) return reply.code(503).send({ error: "QUEUE_UNAVAILABLE" });
     const job = await enqueueSearchRun(deps.queue, { searchId: id, reason: "manual" });
     return reply.code(202).send({ enqueued: true, jobId: job.id });
@@ -171,8 +194,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/flights", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const flights = await listSearchFlights(db, id, { limit: 200 });
     return {
       flights: flights.map((f) => ({
@@ -196,8 +219,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/prices", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const query = request.query as { limit?: string };
     const limit = Math.min(Math.max(Number(query.limit ?? 500) || 500, 1), 5000);
     const snapshots = await listSnapshotsForSearch(db, id, { limit });
@@ -218,8 +241,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/analytics", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const rows = await listObservationsForAnalytics(db, id);
     const observations: PriceObservation[] = rows.map((o) => ({
       priceEurCents: o.priceEurCents,
@@ -274,15 +297,15 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/recommendations", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     return (await buildReports(row)).recommendation;
   });
 
   app.get("/api/searches/:id/advice", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
 
     const { analytics, recommendation } = await buildReports(row);
     const facts = buildAdvisorInput({ search: row, analytics, recommendation });
@@ -296,8 +319,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/notifications", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const query = request.query as { limit?: string };
     const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
     const rows = await listNotificationsForSearch(db, id, { limit });
@@ -320,8 +343,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/provider-requests", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const query = request.query as { limit?: string; provider?: string };
     const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
     const rows = await listProviderRequests(db, {
@@ -345,8 +368,8 @@ export const registerSearchRoutes = (app: ApiInstance, deps: SearchRoutesDeps): 
 
   app.get("/api/searches/:id/events", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const row = await getSearch(db, id);
-    if (!row) return reply.code(404).send({ error: "NOT_FOUND" });
+    const row = await loadOwned(id, request, reply);
+    if (!row) return reply;
     const query = request.query as { limit?: string };
     const limit = Math.min(Math.max(Number(query.limit ?? 200) || 200, 1), 2000);
     const events = await listPriceEventsForSearch(db, id, { limit });

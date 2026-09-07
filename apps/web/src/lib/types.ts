@@ -217,6 +217,18 @@ export interface WorldAirport {
   countryCode: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+
+export interface MeResponse {
+  user: AuthUser | null;
+  /** `false` quand l'API tourne sans `SESSION_SECRET` (mode dev, pas de login). */
+  authRequired: boolean;
+}
+
 export type AdviceAction =
   "COLLECTE" | "ACHETE_MAINTENANT" | "PRET_A_ACHETER" | "SURVEILLE" | "ATTENDS";
 

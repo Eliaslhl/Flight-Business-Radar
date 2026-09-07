@@ -99,22 +99,22 @@ manuel. Un `concurrency.group` empêche deux passages simultanés. Les exécutio
 GitHub Actions sont _best-effort_ (parfois 10-15 min de retard) — sans
 conséquence ici.
 
-### 4. Créer une première recherche
+### 4. Créer un compte
 
-Via l'UI (`https://fbr-web.onrender.com`) ou l'API :
+`SESSION_SECRET` étant défini sur `fbr-api` (le blueprint le génère), l'API
+exige une connexion. Ouvre `https://fbr-web.onrender.com` → **Créer un
+compte** (e-mail + mot de passe ≥ 8 caractères). Le **premier** compte adopte
+automatiquement les recherches / alertes déjà présentes.
 
-```bash
-curl -X POST https://fbr-api.onrender.com/api/searches \
-  -H 'content-type: application/json' \
-  -d '{"origin":"CDG","destinations":["HND"],"cabinClass":"ECONOMY",
-       "departureWindow":{"start":"2026-11-01","end":"2026-11-30"},
-       "tripDuration":{"minDays":10,"maxDays":14}}'
-```
+> Le cron GitHub Actions n'a **pas** besoin de `SESSION_SECRET` : il opère au
+> niveau système (toutes les recherches actives, tous comptes confondus).
 
-`nextRunAt` est immédiat ⇒ le prochain tick du cron la traitera. Pour être
-notifié quand le prix passe sous une cible : créer aussi une **alerte
-`TARGET_PRICE`** sur la recherche (page `/alerts`) — le champ « prix cible » seul
-ne notifie pas.
+### 5. Créer une première recherche
+
+Depuis l'UI (bouton **+ Nouvelle recherche**). `nextRunAt` est immédiat ⇒ le
+prochain tick du cron la traitera. Pour être notifié quand le prix passe sous
+une cible : créer aussi une **alerte `TARGET_PRICE`** sur la recherche (page
+`/alerts`) — le champ « prix cible » seul ne notifie pas.
 
 ### Limites connues (option A)
 

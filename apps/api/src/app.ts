@@ -3,7 +3,10 @@ import { AppError, LogEvent, type Logger } from "@fbr/shared";
 import { pingDatabase, type DbHandle } from "@fbr/database";
 import { type Queue, type SearchRunJobData } from "@fbr/queue";
 import Fastify, { type FastifyError } from "fastify";
+import fastifyCookie from "@fastify/cookie";
+import { resolveUser } from "./auth.js";
 import { registerAlertRoutes } from "./routes/alerts.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerRadarRoutes } from "./routes/radar.js";
 import { registerSearchRoutes } from "./routes/searches.js";
@@ -42,6 +45,14 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
     ajv: { customOptions: { removeAdditional: "all", coerceTypes: true } },
   });
 
+  void app.register(fastifyCookie);
+  // Renseigne `request.userId` (session, ou utilisateur de dev si auth désactivée).
+  const attachUser = resolveUser(config.auth);
+  app.addHook("preHandler", (request, _reply, done) => {
+    attachUser(request);
+    done();
+  });
+
   app.get("/health", async (_request, reply) => {
     let database: HealthReport["checks"]["database"] = "skipped";
     if (db) {
@@ -63,6 +74,7 @@ export const buildApp = (options: BuildAppOptions): ApiInstance => {
   });
 
   if (db) {
+    registerAuthRoutes(app, { db: db.db, auth: config.auth, logger });
     registerSearchRoutes(app, {
       db: db.db,
       ...(queue ? { queue } : {}),

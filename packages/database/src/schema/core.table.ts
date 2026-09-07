@@ -59,6 +59,8 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   displayName: text("display_name"),
+  /** Hash bcrypt du mot de passe. `null` = compte non connectable (ex. Dev User). */
+  passwordHash: text("password_hash"),
   preferredCurrency: varchar("preferred_currency", { length: 3 }).notNull().default("EUR"),
   timezone: text("timezone").notNull().default("Europe/Paris"),
   ...timestamps,

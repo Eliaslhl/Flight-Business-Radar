@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "./auth-gate";
+import { Button } from "./ui";
+import { api } from "@/lib/api";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -11,8 +15,23 @@ const LINKS = [
   { href: "/settings", label: "Réglages" },
 ];
 
+const PUBLIC_PATHS = new Set(["/login", "/register"]);
+
 export function NavBar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const logout = useMutation({
+    mutationFn: () => api.logout(),
+    onSuccess: () => {
+      qc.clear();
+      router.replace("/login");
+    },
+  });
+
+  if (PUBLIC_PATHS.has(pathname)) return null;
+
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-4 overflow-x-auto px-4 sm:gap-6">
@@ -43,6 +62,15 @@ export function NavBar() {
             );
           })}
         </div>
+
+        {user ? (
+          <div className="ml-auto flex shrink-0 items-center gap-2 py-2 text-sm">
+            <span className="hidden text-[var(--color-muted)] sm:inline">{user.email}</span>
+            <Button size="sm" variant="ghost" onClick={() => logout.mutate()}>
+              Déconnexion
+            </Button>
+          </div>
+        ) : null}
       </nav>
     </header>
   );

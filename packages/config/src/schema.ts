@@ -74,6 +74,15 @@ export const configSchema = z
 
     API_HOST: z.string().min(1).default("0.0.0.0"),
     API_PORT: port.default(3001),
+    /**
+     * Secret HMAC des cookies de session. **Défini ⇒ authentification e-mail /
+     * mot de passe activée** sur l'API (routes `/api/searches*` et `/api/alerts*`
+     * exigent une session). Absent ⇒ tout est attribué à l'utilisateur de dev
+     * (comportement historique, pratique en local).
+     */
+    SESSION_SECRET: optionalSecret,
+    /** Durée de vie d'une session, en jours. */
+    SESSION_TTL_DAYS: posInt.max(365).default(30),
 
     BASE_CURRENCY: z
       .string()
@@ -171,6 +180,9 @@ export const configSchema = z
       host: raw.API_HOST,
       port: raw.API_PORT,
     },
+    auth: raw.SESSION_SECRET
+      ? { sessionSecret: raw.SESSION_SECRET, sessionTtlDays: raw.SESSION_TTL_DAYS }
+      : null,
     currency: {
       base: raw.BASE_CURRENCY,
       fxSource: raw.FX_SOURCE,

@@ -4,3 +4,10 @@ import { type FastifyInstance } from "fastify";
 
 /** Instance Fastify paramétrée avec le logger pino de `@fbr/shared`. */
 export type ApiInstance = FastifyInstance<Server, IncomingMessage, ServerResponse, Logger>;
+
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Utilisateur courant (résolu par le `preHandler` d'auth). */
+    userId?: string;
+  }
+}
