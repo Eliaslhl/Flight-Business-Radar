@@ -152,6 +152,12 @@ export interface Health {
   checks: { database: "ok" | "error" | "skipped" };
 }
 
+export interface NotificationChannelsStatus {
+  channels: { name: string; configured: boolean }[];
+  timeoutMs: number;
+  maxAttempts: number;
+}
+
 export interface CreateSearchInput {
   label?: string;
   origin: string;

@@ -14,13 +14,14 @@ pnpm db:migrate    # applique les migrations en attente à DATABASE_URL (idempot
 pnpm --filter @fbr/database db:studio   # explorateur Drizzle
 ```
 
-## État du schéma — Phases 3–7
+## État du schéma — Phases 3–8
 
 `0000` : `app_meta` (table technique de bout-en-bout).
 `0001` : moteur de recherche + seed de l'utilisateur de dev (`00000000-…-0001` / `dev@localhost`).
 `0002` : `price_events` (dérivés) + `fx_rates` (cache des taux de change).
 `0003` : `alerts` + `notifications` (avec `dedupe_key` anti-spam).
 `0004` : `provider_requests` (observabilité des appels providers).
+`0005` : valeur `WEBHOOK` ajoutée à l'enum `notification_channel` (Phase 8).
 
 | Table                      | Rôle                                                                                                              | Points clés                                                                                                                                                                      |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

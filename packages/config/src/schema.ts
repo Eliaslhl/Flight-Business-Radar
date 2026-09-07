@@ -98,8 +98,18 @@ export const configSchema = z
     SERPAPI_API_KEY: optionalSecret,
     DUFFEL_API_TOKEN: optionalSecret,
 
-    // Notifications — optionnel (Phase 8+).
+    // Notifications (Phase 8) — chaque canal s'active quand SA config est
+    // complète ; le canal `console` est toujours actif. Aucun secret en dur.
     TELEGRAM_BOT_TOKEN: optionalSecret,
+    TELEGRAM_CHAT_ID: z.string().trim().min(1).optional(),
+    /** SMTP unique, ex. `smtp://user:pass@host:587` ou `smtps://…:465`. */
+    SMTP_URL: optionalSecret,
+    EMAIL_FROM: z.string().trim().min(1).optional(),
+    EMAIL_TO: z.string().trim().min(1).optional(),
+    /** Webhook générique (Discord / Slack / ntfy / custom) : POST JSON. */
+    NOTIFICATION_WEBHOOK_URL: z.string().url().optional(),
+    NOTIFICATION_TIMEOUT_MS: posInt.default(10_000),
+    NOTIFICATION_MAX_ATTEMPTS: posInt.max(10).default(3),
   })
   .transform((raw) => ({
     env: raw.NODE_ENV,
@@ -146,7 +156,17 @@ export const configSchema = z
       duffel: raw.DUFFEL_API_TOKEN ? { token: raw.DUFFEL_API_TOKEN } : null,
     },
     notifications: {
-      telegram: raw.TELEGRAM_BOT_TOKEN ? { botToken: raw.TELEGRAM_BOT_TOKEN } : null,
+      telegram:
+        raw.TELEGRAM_BOT_TOKEN && raw.TELEGRAM_CHAT_ID
+          ? { botToken: raw.TELEGRAM_BOT_TOKEN, chatId: raw.TELEGRAM_CHAT_ID }
+          : null,
+      email:
+        raw.SMTP_URL && raw.EMAIL_FROM && raw.EMAIL_TO
+          ? { smtpUrl: raw.SMTP_URL, from: raw.EMAIL_FROM, to: raw.EMAIL_TO }
+          : null,
+      webhook: raw.NOTIFICATION_WEBHOOK_URL ? { url: raw.NOTIFICATION_WEBHOOK_URL } : null,
+      timeoutMs: raw.NOTIFICATION_TIMEOUT_MS,
+      maxAttempts: raw.NOTIFICATION_MAX_ATTEMPTS,
     },
   }));
 

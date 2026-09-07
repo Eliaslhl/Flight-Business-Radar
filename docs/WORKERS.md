@@ -54,7 +54,7 @@ L'API (`POST /api/searches/:id/run`) peut enfiler un job `reason: "manual"` imm�
 5. `upsertOffer` + `upsertProviderLink` + **INSERT** `price_snapshots` (jamais d'écrasement), avec `price_eur_cents` normalisé par `FxService` (`@fbr/fx`) ;
 6. `insertProviderRequests` (journal d'observabilité : `provider, ok, offer_count, latency_ms, error_code/message`) puis `markCombinationsChecked` ;
 7. **passe `analyze`** (`analyzeOffers`, Phase 4) : par offre touchée, `derivePriceEvents` (`@fbr/analytics`) → INSERT `price_events` + résolution des baisses ouvertes revenues ;
-8. **pipeline d'alerte** (`runAlertPipeline`, Phase 5) : `matchAlerts` → cooldown → dédup (`dedupe_key`) → **confirmation** des prix exceptionnels (re-requête via `@fbr/fx`) → `NotificationService.dispatch` → lignes `notifications` ; voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md) ;
+8. **pipeline d'alerte** (`runAlertPipeline`, Phase 5) : `matchAlerts` → cooldown → dédup (`dedupe_key`) → **confirmation** des prix exceptionnels (re-requête via `@fbr/fx`) → `NotificationService.dispatch` sur les canaux actifs (`buildNotificationService`, Phase 8 : console + Telegram / Email / Webhook selon la config) → une ligne `notifications` par canal (`SENT`/`FAILED`) ; voir [`NOTIFICATIONS.md`](NOTIFICATIONS.md) ;
 9. `computeNextIntervalSeconds` (palier COLD/NORMAL/WARM/HOT/VERIFY + plancher provider + jitter) et `computeSearchPriority` → `updateSearchSchedule`.
 
 Retourne un `SearchRunSummary` (combinaisons, offres, snapshots, meilleur prix, `eventsDetected`, `eventsResolved`, `alertsTriggered`, `alertsSuppressed`, `confirmationsFailed`, palier, prochain intervalle, erreurs provider).
@@ -85,3 +85,7 @@ Départ imminent (`daysUntilDeparture ≤ 10`) → resserre d'un cran. Jitter ±
 | `FX_SOURCE` / `FX_FIXED_RATES`                                                | frankfurter            | Source des taux de change / taux fixes JSON                             |
 | `DROP_PCT` / `FLASH_DROP_PCT` / `FLASH_DROP_ABS_EUR` / `FLASH_WINDOW_MINUTES` | 0.05 / 0.12 / 120 / 90 | Seuils de détection de baisse                                           |
 | `ANALYTICS_MIN_SAMPLE`                                                        | 30                     | Échantillon minimal (`UNUSUAL`, fiabilité)                              |
+| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`                                     | _(vide)_               | Active le canal `TELEGRAM` (les deux requis)                            |
+| `SMTP_URL` + `EMAIL_FROM` + `EMAIL_TO`                                        | _(vide)_               | Active le canal `EMAIL` (SMTP `nodemailer`, les trois requis)           |
+| `NOTIFICATION_WEBHOOK_URL`                                                    | _(vide)_               | Active le canal `WEBHOOK` (POST JSON — Discord / Slack / ntfy / custom) |
+| `NOTIFICATION_TIMEOUT_MS` / `NOTIFICATION_MAX_ATTEMPTS`                       | 10000 / 3              | Timeout dur et nombre de tentatives par canal réseau                    |
