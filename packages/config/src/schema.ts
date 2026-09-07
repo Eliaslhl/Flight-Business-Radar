@@ -97,7 +97,11 @@ export const configSchema = z
     // utilise FastFlightsProvider au lieu du MockFlightProvider.
     FAST_FLIGHTS_URL: z.string().url().optional(),
     FAST_FLIGHTS_TIMEOUT_MS: posInt.default(20_000),
+    // SerpApi Google Flights (1er provider réel payant — 1 recherche = 1 crédit).
     SERPAPI_API_KEY: optionalSecret,
+    SERPAPI_TIMEOUT_MS: posInt.default(20_000),
+    /** Plafond de destinations interrogées par run (garde-fou budget mode Radar). */
+    SERPAPI_MAX_DESTINATIONS: posInt.max(60).default(8),
     DUFFEL_API_TOKEN: optionalSecret,
 
     // Notifications (Phase 8) — chaque canal s'active quand SA config est
@@ -162,7 +166,13 @@ export const configSchema = z
       fastFlights: raw.FAST_FLIGHTS_URL
         ? { url: raw.FAST_FLIGHTS_URL, timeoutMs: raw.FAST_FLIGHTS_TIMEOUT_MS }
         : null,
-      serpapi: raw.SERPAPI_API_KEY ? { apiKey: raw.SERPAPI_API_KEY } : null,
+      serpapi: raw.SERPAPI_API_KEY
+        ? {
+            apiKey: raw.SERPAPI_API_KEY,
+            timeoutMs: raw.SERPAPI_TIMEOUT_MS,
+            maxDestinations: raw.SERPAPI_MAX_DESTINATIONS,
+          }
+        : null,
       duffel: raw.DUFFEL_API_TOKEN ? { token: raw.DUFFEL_API_TOKEN } : null,
     },
     notifications: {

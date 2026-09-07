@@ -39,8 +39,20 @@ La déduplication inter-providers est faite ensuite par `@fbr/normalizer`.
 | `MockFlightProvider`    | ✅ Phase 2     | Provider de test déterministe. Aucune I/O.                                                                                       |
 | `FixtureFlightProvider` | ✅ Phase 7     | Rejoue des `FlightOffer` canoniques (tests, CI, démo hors-ligne). Aucune I/O.                                                    |
 | `FastFlightsProvider`   | ✅ Phase 7     | Client HTTP du sidecar `services/flight-scraper` (Google Flights via `fast-flights`). Actif quand `FAST_FLIGHTS_URL` est défini. |
-| SerpApi Google Flights  | ⏳ (au besoin) | Provider réel payant. Documenté §43 ; à brancher ici sans toucher au pipeline.                                                   |
+| `SerpApiFlightProvider` | ✅             | **Provider réel payant** (SerpApi Google Flights). Actif quand `SERPAPI_API_KEY` est défini. 1 recherche = 1 crédit SerpApi.     |
 | Duffel                  | ⏳ (au besoin) | Oracle de confirmation des flash drops + lien de réservation.                                                                    |
+
+### Composition (`apps/worker/src/providers.ts`)
+
+`buildProviderRegistry` compose la liste **par présence de config** (Phase 0 §5 — jamais de
+dépendance à un seul fournisseur) :
+
+| Config présente    | Providers actifs                                                |
+| ------------------ | --------------------------------------------------------------- |
+| `SERPAPI_API_KEY`  | `serpapi`                                                       |
+| `FAST_FLIGHTS_URL` | `fast-flights`                                                  |
+| les deux           | `serpapi` + `fast-flights` (parallèle, dédup par le normalizer) |
+| aucun              | `mock`                                                          |
 
 ## `FastFlightsProvider` + sidecar `services/flight-scraper` (Phase 7)
 
@@ -118,6 +130,45 @@ Puis dans `.env` : `FAST_FLIGHTS_URL=http://localhost:8000`.
 Chaque appel provider (succès **ou** échec) est journalisé en base par le worker :
 table `provider_requests` (`provider, search_id, ok, offer_count, latency_ms, error_code,
 error_message, created_at`). Exposé via `GET /api/searches/:id/provider-requests`.
+
+## `SerpApiFlightProvider` — SerpApi Google Flights (payant)
+
+1er provider **réel payant** (Phase 0 §2 — meilleur compromis documenté / couverture
+juridique / Business Class). `engine=google_flights`, `travel_class=3`.
+
+### Coût & garde-fous
+
+- **1 appel HTTP = 1 crédit SerpApi.** Un run de recherche « normale » = 1 crédit
+  (1 destination). Un run **mode Radar** = `RADAR_BATCH_SIZE` crédits (une destination
+  de la tranche seed par crédit).
+- Plafond `SERPAPI_MAX_DESTINATIONS` (défaut 8) : le provider tronque au-delà et loggue
+  un `debug` — protège d'un dépassement de quota accidentel.
+- `HTTP 429` (quota) et `HTTP 401` (clé) → `ProviderError` **non-retryable** (réessayer
+  tout de suite est inutile). `HTTP 5xx` → retryable. Timeout / réseau → `PROVIDER_TIMEOUT`.
+- Surveiller la consommation via `provider_requests` (`provider = "serpapi"`,
+  `latency_ms`, `ok`).
+- La cadence est déjà bornée par la surveillance adaptative
+  (`computeNextIntervalSeconds` + `PROVIDER_MIN_INTERVAL_SECONDS`).
+
+### Conversion
+
+- `best_flights` + `other_flights` → une `FlightOffer` par option ; option **sans `price`**
+  ignorée. `price` (unités entières de la devise) → `price.amount` en centimes.
+- Trajet **aller** détaillé depuis `option.flights` (horaires locaux `YYYY-MM-DD HH:MM`
+  sérialisés `…T…:…:00Z` nominal, comme le sidecar) ; `flight_number` « AF 276 » → `AF276` ;
+  nom de compagnie → code IATA via `airline-codes`.
+- Trajet **retour** : le 1er appel SerpApi (round trip) ne renvoie que l'aller ; l'inbound
+  est **synthétisé** de façon déterministe (mêmes dates de requête, même compagnie) —
+  empreinte stable, historique de prix cohérent. Le **prix total**, lui, est réel.
+  `option.departure_token` est conservé dans `raw` pour un éventuel 2ᵉ appel (détails retour).
+
+### Config (`.env`)
+
+| Variable                   | Défaut   | Rôle                                                           |
+| -------------------------- | -------- | -------------------------------------------------------------- |
+| `SERPAPI_API_KEY`          | _(vide)_ | Active le provider. **Secret — jamais committé.**              |
+| `SERPAPI_TIMEOUT_MS`       | 20000    | Timeout par appel                                              |
+| `SERPAPI_MAX_DESTINATIONS` | 8        | Plafond de destinations interrogées par run (garde-fou budget) |
 
 ## `MockFlightProvider` — scénarios
 
