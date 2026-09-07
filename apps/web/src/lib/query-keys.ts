@@ -1,4 +1,5 @@
 export const qk = {
+  me: ["me"] as const,
   health: ["health"] as const,
   notificationChannels: ["notification-channels"] as const,
   radarDestinations: ["radar-destinations"] as const,

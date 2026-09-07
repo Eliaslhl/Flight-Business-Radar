@@ -194,6 +194,12 @@ describe("loadConfig", () => {
     });
   });
 
+  it("auth : null sans SESSION_SECRET, structuré avec", () => {
+    expect(loadConfig({ ...baseEnv }).auth).toBeNull();
+    const cfg = loadConfig({ ...baseEnv, SESSION_SECRET: "s3cr3t", SESSION_TTL_DAYS: "7" });
+    expect(cfg.auth).toEqual({ sessionSecret: "s3cr3t", sessionTtlDays: 7 });
+  });
+
   it("REDIS_URL optionnel : absent ⇒ redis null (runner one-shot sans file)", () => {
     expect(loadConfig({ DATABASE_URL: baseEnv.DATABASE_URL }).redis).toBeNull();
     expect(loadConfig({ ...baseEnv, REDIS_URL: "" }).redis).toBeNull();

@@ -1,10 +1,12 @@
 import type {
   Alert,
   AnalyticsReport,
+  AuthUser,
   CreateAlertInput,
   CreateSearchInput,
   Advice,
   Health,
+  MeResponse,
   Notification,
   NotificationChannelsStatus,
   RecommendationReport,
@@ -31,10 +33,12 @@ export class ApiError extends Error {
 }
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  // `content-type: application/json` uniquement quand il y a un corps — sinon
+  // Fastify rejette un POST « vide » (logout, activate/pause/run…) en 400.
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
-      "content-type": "application/json",
+      ...(init?.body != null ? { "content-type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -57,6 +61,19 @@ const post = (path: string, body?: unknown): Promise<unknown> =>
 export const api = {
   health: () => request<Health>("/health"),
   notificationChannels: () => request<NotificationChannelsStatus>("/api/notifications/channels"),
+
+  me: () => request<MeResponse>("/api/auth/me"),
+  register: (email: string, password: string) =>
+    request<{ user: AuthUser }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  login: (email: string, password: string) =>
+    request<{ user: AuthUser }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST" }),
 
   listSearches: () => request<{ searches: Search[] }>("/api/searches").then((r) => r.searches),
   getSearch: (id: string) => request<Search>(`/api/searches/${id}`),

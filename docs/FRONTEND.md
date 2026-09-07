@@ -53,8 +53,11 @@ src/
 
 ## Auth
 
-Aucune (Phase 6) : toutes les données appartiennent à l'utilisateur de dev `dev@localhost`.
-Auth.js viendra quand l'API exposera l'authentification.
+`AuthGate` (`components/auth-gate.tsx`) interroge `GET /api/auth/me` : si l'API
+exige une session (`SESSION_SECRET` défini) et qu'aucune n'est présente, redirige
+vers `/login`. Pages `/login` + `/register` (e-mail + mot de passe), déconnexion
+dans la barre de nav. Sans `SESSION_SECRET` côté API, `me` renvoie
+`authRequired: false` et l'app fonctionne sans login (utilisateur de dev).
 
 ## Tests
 

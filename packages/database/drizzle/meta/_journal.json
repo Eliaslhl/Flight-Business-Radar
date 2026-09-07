@@ -43,6 +43,13 @@
       "when": 1788788848782,
       "tag": "0005_right_dreaming_celestial",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788814576794,
+      "tag": "0006_jittery_scourge",
+      "breakpoints": true
     }
   ]
 }

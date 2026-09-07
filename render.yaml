@@ -39,6 +39,10 @@ services:
       # À renseigner dans le dashboard Render (jamais commité) :
       - key: DATABASE_URL
         sync: false
+      # Secret des cookies de session — DÉFINI ⇒ comptes e-mail / mot de passe
+      # activés. Render peut le générer : `generateValue: true`.
+      - key: SESSION_SECRET
+        generateValue: true
       # Facultatif — active la rédaction du conseil par Claude côté API.
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -1,12 +1,32 @@
 # API HTTP
 
 Base : `http://localhost:3001` (config `API_HOST` / `API_PORT`). Fastify + logger pino.
-Auth : **aucune** en Phase 3 — toutes les recherches appartiennent à l'utilisateur de dev.
+Auth : **cookie de session** si `SESSION_SECRET` est défini côté API — sinon
+tout est attribué à l'utilisateur de dev (pratique en local, aucun login).
+Voir [Authentification](#authentification).
 Les montants sont en **centimes entiers** (`*Cents`).
 
 ## `GET /health`
 
 `200` `{ status: "ok", service, version, uptimeSeconds, checks: { database } }` — `503` + `status: "degraded"` si la base est injoignable.
+
+## Authentification
+
+Activée uniquement si `SESSION_SECRET` est défini. Cookie `fbr_session`
+(`httpOnly`, `sameSite=lax`, `secure` en prod), jeton HMAC-SHA256 `<userId>.<exp>.<sig>`,
+durée `SESSION_TTL_DAYS` (30 j). Les routes `/api/searches*` et `/api/alerts*`
+renvoient alors `401 { error: "UNAUTHENTICATED" }` sans session, et cloisonnent
+tout par `user_id` (accès à la ressource d'un autre ⇒ `404`).
+
+| Route                     | Corps / réponse                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `POST /api/auth/register` | `{ email, password (≥8) }` → `201 { user }` + cookie ; `409 EMAIL_TAKEN` ; `501 AUTH_DISABLED` |
+| `POST /api/auth/login`    | `{ email, password }` → `200 { user }` + cookie ; `401 INVALID_CREDENTIALS`                    |
+| `POST /api/auth/logout`   | `200 { ok: true }` — efface le cookie                                                          |
+| `GET /api/auth/me`        | `{ user \| null, authRequired }` ; `401` si session requise mais absente                       |
+
+Le **tout premier** compte créé sur un déploiement adopte les recherches /
+alertes / notifications encore rattachées à l'utilisateur de dev.
 
 ## Recherches
 
