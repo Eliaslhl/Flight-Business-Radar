@@ -1,13 +1,18 @@
-# Render Blueprint — héberge l'API Fastify (`@fbr/api`) sur le plan gratuit.
-# Le worker n'est PAS déployé ici : sur l'offre gratuite, la surveillance tourne
-# via le cron GitHub Actions (`.github/workflows/poll.yml`). Voir docs/DEPLOY.md.
+# Render Blueprint — héberge l'API Fastify (`@fbr/api`) ET le front Next.js
+# (`@fbr/web`) sur le plan gratuit, en un seul déploiement.
+# La surveillance des prix tourne via le cron GitHub Actions
+# (`.github/workflows/poll.yml`) — aucun worker déployé ici. Voir docs/DEPLOY.md.
+#
+# Région : `ohio` pour coller à une base Neon `us-east-2`. À changer (ex.
+# `frankfurt`) si la base est créée en Europe — garder les deux services et la
+# base dans la même région.
 services:
+  # ── API ──────────────────────────────────────────────────────────────────
   - type: web
     name: fbr-api
     runtime: node
     plan: free
-    region: frankfurt
-    # Le service gratuit s'endort après 15 min d'inactivité (réveil ~50 s).
+    region: ohio
     buildFilter:
       paths:
         - apps/api/**
@@ -35,3 +40,31 @@ services:
       # Facultatif — active la rédaction du conseil par Claude côté API.
       - key: ANTHROPIC_API_KEY
         sync: false
+
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  - type: web
+    name: fbr-web
+    runtime: node
+    plan: free
+    region: ohio
+    buildFilter:
+      paths:
+        - apps/web/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @fbr/web... build
+    startCommand: pnpm --filter @fbr/web exec next start -p $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Résolu automatiquement vers le hostname public de l'API ci-dessus.
+      # `next.config.mjs` préfixe `https://` si le protocole manque.
+      - key: API_INTERNAL_URL
+        fromService:
+          type: web
+          name: fbr-api
+          property: host
