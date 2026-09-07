@@ -92,6 +92,27 @@ export const dedupeAgainstExistingSnapshots = async (
   );
 };
 
+/**
+ * Purge de rétention : supprime les snapshots dont `observed_at` est antérieur à
+ * `now - retentionDays`. Opération de maintenance délibérée (la table reste
+ * append-only en écriture applicative) — lancée par le runner one-shot
+ * `@fbr/worker/once` pour tenir dans un Postgres gratuit. `retentionDays <= 0`
+ * ⇒ no-op. Retourne le nombre de lignes supprimées.
+ */
+export const pruneOldSnapshots = async (
+  db: Database,
+  retentionDays: number,
+  now: Date = new Date(),
+): Promise<number> => {
+  if (!Number.isFinite(retentionDays) || retentionDays <= 0) return 0;
+  const cutoff = new Date(now.getTime() - retentionDays * 86_400_000);
+  const deleted = await db
+    .delete(priceSnapshots)
+    .where(lt(priceSnapshots.observedAt, cutoff))
+    .returning({ id: priceSnapshots.id });
+  return deleted.length;
+};
+
 export const listSnapshotsForSearch = async (
   db: Database,
   searchId: string,

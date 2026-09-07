@@ -1,0 +1,37 @@
+# Render Blueprint — héberge l'API Fastify (`@fbr/api`) sur le plan gratuit.
+# Le worker n'est PAS déployé ici : sur l'offre gratuite, la surveillance tourne
+# via le cron GitHub Actions (`.github/workflows/poll.yml`). Voir docs/DEPLOY.md.
+services:
+  - type: web
+    name: fbr-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    # Le service gratuit s'endort après 15 min d'inactivité (réveil ~50 s).
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @fbr/api... build
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_PRETTY
+        value: "false"
+      - key: API_HOST
+        value: 0.0.0.0
+      # Render route le trafic HTTP vers ce port.
+      - key: API_PORT
+        value: "10000"
+      # À renseigner dans le dashboard Render (jamais commité) :
+      - key: DATABASE_URL
+        sync: false
+      # Facultatif — active la rédaction du conseil par Claude côté API.
+      - key: ANTHROPIC_API_KEY
+        sync: false

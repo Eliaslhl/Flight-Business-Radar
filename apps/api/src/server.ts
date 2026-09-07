@@ -12,15 +12,20 @@ const logger = createLogger({
 });
 
 const db = createDatabase({ url: config.database.url });
-const connection = createQueueConnection(config.redis.url);
-const queue = createSearchQueue(connection);
-const app = buildApp({ config, logger, db, queue });
+// File Redis optionnelle : sans `REDIS_URL`, l'API sert en lecture seule et
+// `POST /api/searches/:id/run` répond 503 (l'enqueue manuel est indisponible).
+const connection = config.redis ? createQueueConnection(config.redis.url) : null;
+const queue = connection ? createSearchQueue(connection) : undefined;
+if (!queue) {
+  logger.warn({ event: "queue_disabled" }, "REDIS_URL absent — enqueue manuel désactivé");
+}
+const app = buildApp({ config, logger, db, ...(queue ? { queue } : {}) });
 
 const shutdown = async (signal: string): Promise<void> => {
   logger.info({ event: LogEvent.AppStopped, signal }, "arrêt de l'api");
   await app.close();
-  await queue.close();
-  await connection.quit();
+  if (queue) await queue.close();
+  if (connection) await connection.quit();
   await db.close();
   process.exit(0);
 };

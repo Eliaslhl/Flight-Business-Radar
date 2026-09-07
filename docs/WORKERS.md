@@ -27,6 +27,16 @@ pose un bail sur next_run_at                                       ▼
 
 L'API (`POST /api/searches/:id/run`) peut enfiler un job `reason: "manual"` immédiat.
 
+### Runner one-shot (`apps/worker/src/once.ts`) — sans Redis
+
+Pour un déploiement gratuit (cf. [`DEPLOY.md`](DEPLOY.md)), `@fbr/worker/once`
+remplace scheduler + file + worker par **un passage unique** : `listDueSearches`
+→ `processSearchRun` en boucle séquentielle → `pruneOldSnapshots`. Aucune
+connexion Redis. `--migrate` applique d'abord les migrations. Pensé pour un cron
+(GitHub Actions, `*/15`). `ONCE_MAX_SEARCHES` plafonne le lot ;
+`SNAPSHOT_RETENTION_DAYS` pilote la purge. `main.ts` (long-running) exige
+toujours `REDIS_URL` et sort en `1` s'il manque.
+
 ## `@fbr/queue`
 
 | Élément                                                      | Rôle                                                                  |

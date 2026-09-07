@@ -53,7 +53,13 @@ export const configSchema = z
     LOG_PRETTY: boolish.default("false"),
 
     DATABASE_URL: z.string().url().startsWith("postgres"),
-    REDIS_URL: z.string().url().startsWith("redis"),
+    // Optionnel : le worker long-running et l'enqueue manuel de l'API en ont
+    // besoin, mais le runner one-shot (`worker/once`, cron GitHub Actions) tourne
+    // sans file. Absent ⇒ `redis: null`, ces deux chemins se dégradent proprement.
+    REDIS_URL: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z.string().url().startsWith("redis").optional(),
+    ),
 
     API_HOST: z.string().min(1).default("0.0.0.0"),
     API_PORT: port.default(3001),
@@ -79,6 +85,10 @@ export const configSchema = z
     PROVIDER_MIN_INTERVAL_SECONDS: posInt.default(60),
     /** Mode Radar : destinations seed sondées par run (tranche rotative). */
     RADAR_BATCH_SIZE: posInt.max(60).default(8),
+    /** Runner one-shot : plafond de recherches dues traitées en un passage. */
+    ONCE_MAX_SEARCHES: posInt.max(500).default(100),
+    /** Purge des `price_snapshots` plus vieux que N jours (runner one-shot). */
+    SNAPSHOT_RETENTION_DAYS: posInt.default(180),
     // Scénario du MockFlightProvider tant qu'aucun provider réel n'est branché (Phase 7).
     MOCK_SCENARIO: z
       .enum([
@@ -145,9 +155,7 @@ export const configSchema = z
     database: {
       url: raw.DATABASE_URL,
     },
-    redis: {
-      url: raw.REDIS_URL,
-    },
+    redis: raw.REDIS_URL ? { url: raw.REDIS_URL } : null,
     api: {
       host: raw.API_HOST,
       port: raw.API_PORT,
@@ -170,6 +178,8 @@ export const configSchema = z
       combinationsPerRun: raw.SEARCH_COMBINATIONS_PER_RUN,
       providerMinIntervalSeconds: raw.PROVIDER_MIN_INTERVAL_SECONDS,
       radarBatchSize: raw.RADAR_BATCH_SIZE,
+      onceMaxSearches: raw.ONCE_MAX_SEARCHES,
+      snapshotRetentionDays: raw.SNAPSHOT_RETENTION_DAYS,
       mockScenario: raw.MOCK_SCENARIO,
     },
     providers: {
