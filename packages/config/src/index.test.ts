@@ -47,7 +47,7 @@ describe("loadConfig", () => {
       token: "tp-abc",
       marker: "998877",
       timeoutMs: 20_000,
-      maxDestinations: 8,
+      maxDestinations: 25,
     });
   });
 

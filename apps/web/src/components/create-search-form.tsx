@@ -28,10 +28,8 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
   const [form, setForm] = useState({
     label: "",
     origin: "CDG",
-    start: "",
-    end: "",
-    minDays: "10",
-    maxDays: "14",
+    depart: "",
+    retour: "",
     maxStops: "1",
     maxPriceEur: "1500",
     targetPriceEur: "1200",
@@ -59,6 +57,11 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
     onError: () => toast("Création impossible — réessaie", "error"),
   });
 
+  const nights = Math.max(
+    1,
+    Math.round((Date.parse(form.retour) - Date.parse(form.depart)) / 86_400_000) || 1,
+  );
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body: CreateSearchInput = {
@@ -66,8 +69,9 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
       destinations: dests,
       // Plus de choix de cabine : le worker remonte les 3 moins chères, cabine mélangée.
       cabinClass: "ECONOMY",
-      departureWindow: { start: form.start, end: form.end },
-      tripDuration: { minDays: Number(form.minDays), maxDays: Number(form.maxDays) },
+      // Dates exactes : fenêtre réduite à l'aller, durée = nb de nuits jusqu'au retour.
+      departureWindow: { start: form.depart, end: form.depart },
+      tripDuration: { minDays: nights, maxDays: nights },
       maxStops: Number(form.maxStops),
     };
     if (form.label.trim()) body.label = form.label.trim();
@@ -131,36 +135,29 @@ export function CreateSearchForm({ onCreated }: { onCreated?: () => void }) {
         <Field label="Escales max">
           <Input type="number" min={0} max={4} value={form.maxStops} onChange={set("maxStops")} />
         </Field>
-        <Field label="Début de fenêtre">
+        <Field label="Date aller">
           <Input
             type="date"
             min={todayISO()}
-            value={form.start}
+            value={form.depart}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
-                start: e.target.value,
-                // garde une fin cohérente : jamais avant le nouveau début
-                end: f.end && f.end < e.target.value ? e.target.value : f.end,
+                depart: e.target.value,
+                retour: f.retour && f.retour <= e.target.value ? "" : f.retour,
               }))
             }
             required
           />
         </Field>
-        <Field label="Fin de fenêtre">
+        <Field label="Date retour">
           <Input
             type="date"
-            min={form.start || todayISO()}
-            value={form.end}
-            onChange={set("end")}
+            min={form.depart || todayISO()}
+            value={form.retour}
+            onChange={set("retour")}
             required
           />
-        </Field>
-        <Field label="Durée min (jours)">
-          <Input type="number" min={1} value={form.minDays} onChange={set("minDays")} />
-        </Field>
-        <Field label="Durée max (jours)">
-          <Input type="number" min={1} value={form.maxDays} onChange={set("maxDays")} />
         </Field>
         <Field label="Budget max (€)">
           <Input type="number" min={0} value={form.maxPriceEur} onChange={set("maxPriceEur")} />

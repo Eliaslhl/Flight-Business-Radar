@@ -53,6 +53,21 @@ const toIso = (raw: string | undefined): string | null => {
 const dateOf = (iso: string | null, fallback: string): string =>
   iso ? iso.slice(0, 10) : fallback;
 
+/**
+ * Lien Google Flights pré-rempli (route + dates). Pas un lien de réservation
+ * direct (ça coûterait un crédit SerpApi par offre) mais amène l'utilisateur au
+ * bon endroit pour comparer et réserver.
+ */
+const googleFlightsUrl = (
+  origin: string,
+  destination: string,
+  outboundDate: string,
+  returnDate: string,
+): string => {
+  const q = `Flights to ${destination} from ${origin} on ${outboundDate} through ${returnDate}`;
+  return `https://www.google.com/travel/flights?q=${encodeURIComponent(q)}`;
+};
+
 /** « AF 276 » / « AF276 » → « AF276 » (2–8 caractères) sinon `null`. */
 const normalizeFlightNumber = (raw: string | undefined): string | null => {
   if (!raw) return null;
@@ -268,6 +283,7 @@ export class SerpApiFlightProvider implements FlightProvider {
       inbound,
       price: { amount: Math.round(option.price * 100), currency: request.currency },
       availability: "UNKNOWN" as const,
+      bookingUrl: googleFlightsUrl(request.origin, destination, outbound.departureDate, returnDate),
       observedAt: this.now(),
       fingerprint,
       raw: {

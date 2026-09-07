@@ -5,15 +5,16 @@ import { useQuery } from "@tanstack/react-query";
 import { PriorityBadge, StatusBadge } from "./badges";
 import { CABIN_LABEL } from "./create-search-form";
 import { TrendPicto } from "./trend-picto";
-import { Badge, Card } from "./ui";
+import { Card } from "./ui";
 import { api } from "@/lib/api";
 import { flagEmoji } from "@/lib/flags";
 import { formatEur, relativeTime } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import type { Search } from "@/lib/types";
+import type { CabinClass, Search } from "@/lib/types";
 
 /** Rafraîchissement d'affichage : la donnée derrière bouge moins souvent. */
 const REFRESH_MS = 60_000;
+const CABIN_ORDER: CabinClass[] = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS"];
 
 export function SearchCard({ search }: { search: Search }) {
   const flights = useQuery({
@@ -31,10 +32,23 @@ export function SearchCard({ search }: { search: Search }) {
     flagEmoji(airports.data?.find((a) => a.iata === iata)?.countryCode);
   const route = [search.origin, ...search.destinations];
 
-  const top3 = [...(flights.data ?? [])]
-    .sort((a, b) => a.latestPriceCents - b.latestPriceCents)
-    .slice(0, 3);
-  const best = top3[0]?.latestPriceCents ?? null;
+  // Le moins cher PAR cabine (Éco / Éco+ / Affaires).
+  const cheapestByCabin = CABIN_ORDER.map((cabin) => {
+    const offers = (flights.data ?? []).filter((f) => f.cabinClass === cabin);
+    if (offers.length === 0) return { cabin, flight: null };
+    return {
+      cabin,
+      flight: offers.reduce((a, b) => (b.latestPriceCents < a.latestPriceCents ? b : a)),
+    };
+  });
+  const best =
+    cheapestByCabin.reduce<number | null>(
+      (acc, c) =>
+        c.flight && (acc === null || c.flight.latestPriceCents < acc)
+          ? c.flight.latestPriceCents
+          : acc,
+      null,
+    ) ?? null;
   const target = search.targetPriceCents;
   const belowTarget = best !== null && target !== null && best <= target;
 
@@ -80,16 +94,16 @@ export function SearchCard({ search }: { search: Search }) {
           ) : null}
         </div>
 
-        {top3.length > 1 ? (
-          <ul className="mt-3 space-y-1 text-xs">
-            {top3.map((f) => (
-              <li key={f.fingerprint} className="flex items-center justify-between gap-2">
-                <span className="tnum font-medium">{formatEur(f.latestPriceCents)}</span>
-                <Badge tone="neutral">{CABIN_LABEL[f.cabinClass]}</Badge>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <ul className="mt-3 space-y-1 text-xs">
+          {cheapestByCabin.map(({ cabin, flight }) => (
+            <li key={cabin} className="flex items-center justify-between gap-2">
+              <span className="text-[var(--color-muted)]">{CABIN_LABEL[cabin]}</span>
+              <span className="tnum font-medium">
+                {flight ? formatEur(flight.latestPriceCents) : "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
 
         <div className="mt-4 flex items-center justify-between text-xs text-[var(--color-muted)]">
           <PriorityBadge priority={search.priority} />

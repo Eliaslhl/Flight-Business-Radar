@@ -135,7 +135,7 @@ export const configSchema = z
     /** Marqueur affilié (optionnel) — active les liens de réservation Aviasales. */
     TRAVELPAYOUTS_MARKER: optionalText,
     TRAVELPAYOUTS_TIMEOUT_MS: posInt.default(20_000),
-    TRAVELPAYOUTS_MAX_DESTINATIONS: posInt.max(60).default(8),
+    TRAVELPAYOUTS_MAX_DESTINATIONS: posInt.max(60).default(25),
     // SerpApi Google Flights (1er provider réel payant — 1 recherche = 1 crédit).
     SERPAPI_API_KEY: optionalSecret,
     SERPAPI_TIMEOUT_MS: posInt.default(20_000),
