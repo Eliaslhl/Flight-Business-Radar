@@ -50,6 +50,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fbr/advisor':
+        specifier: workspace:*
+        version: link:../../packages/advisor
       '@fbr/alerting':
         specifier: workspace:*
         version: link:../../packages/alerting
@@ -167,6 +170,15 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.23.13
+
+  packages/advisor:
+    dependencies:
+      '@fbr/analytics':
+        specifier: workspace:*
+        version: link:../analytics
+      '@fbr/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/alerting:
     dependencies:

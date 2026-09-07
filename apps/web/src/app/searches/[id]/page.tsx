@@ -18,7 +18,22 @@ import {
   relativeTime,
 } from "@/lib/format";
 import { qk } from "@/lib/query-keys";
-import type { OpportunityBand, RecommendationReport } from "@/lib/types";
+import type { AdviceAction, OpportunityBand, RecommendationReport } from "@/lib/types";
+
+const ADVICE_LABEL: Record<AdviceAction, string> = {
+  COLLECTE: "Encore trop tôt",
+  ACHETE_MAINTENANT: "Achète maintenant",
+  PRET_A_ACHETER: "Bon moment",
+  SURVEILLE: "Surveille",
+  ATTENDS: "Attends",
+};
+const ADVICE_TONE: Record<AdviceAction, "ok" | "accent" | "warn" | "neutral"> = {
+  COLLECTE: "neutral",
+  ACHETE_MAINTENANT: "ok",
+  PRET_A_ACHETER: "accent",
+  SURVEILLE: "warn",
+  ATTENDS: "neutral",
+};
 
 export default function SearchDetailPage() {
   const id = String(useParams().id);
@@ -31,6 +46,11 @@ export default function SearchDetailPage() {
   const recommendations = useQuery({
     queryKey: qk.recommendations(id),
     queryFn: () => api.recommendations(id),
+  });
+  const advice = useQuery({
+    queryKey: qk.advice(id),
+    queryFn: () => api.advice(id),
+    retry: false,
   });
   const events = useQuery({ queryKey: qk.events(id), queryFn: () => api.events(id) });
   const notifications = useQuery({
@@ -47,6 +67,7 @@ export default function SearchDetailPage() {
         qk.prices(id),
         qk.analytics(id),
         qk.recommendations(id),
+        qk.advice(id),
         qk.events(id),
         qk.notifications(id),
       ]) {
@@ -125,6 +146,39 @@ export default function SearchDetailPage() {
           <ErrorState error={recommendations.error} />
         ) : (
           <RecommendationsBody data={recommendations.data} />
+        )}
+      </Card>
+
+      <Card>
+        <CardTitle>Conseil</CardTitle>
+        {advice.isLoading ? (
+          <Spinner />
+        ) : advice.isError ? (
+          <ErrorState error={advice.error} />
+        ) : advice.data ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={ADVICE_TONE[advice.data.action]}>
+                {ADVICE_LABEL[advice.data.action]}
+              </Badge>
+              <span className="text-xs text-[var(--color-muted)]">
+                généré par {advice.data.model === "rules" ? "règles" : advice.data.model}
+              </span>
+              {advice.data.fallback && advice.data.verdict === "FLAGGED" ? (
+                <Badge tone="warn">réponse recadrée</Badge>
+              ) : null}
+            </div>
+            <p className="whitespace-pre-line leading-relaxed">{advice.data.text}</p>
+            {advice.data.fallback && advice.data.verdict === "FLAGGED" ? (
+              <p className="text-xs text-[var(--color-muted)]">
+                Le modèle a cité des valeurs hors de l&apos;historique
+                {advice.data.flagged.length > 0 ? ` (${advice.data.flagged.join(", ")})` : ""} : le
+                conseil déterministe est affiché à la place.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState>Pas encore de conseil.</EmptyState>
         )}
       </Card>
 

@@ -3,6 +3,7 @@ import type {
   AnalyticsReport,
   CreateAlertInput,
   CreateSearchInput,
+  Advice,
   Health,
   Notification,
   NotificationChannelsStatus,
@@ -74,6 +75,7 @@ export const api = {
   analytics: (id: string) => request<AnalyticsReport>(`/api/searches/${id}/analytics`),
   recommendations: (id: string) =>
     request<RecommendationReport>(`/api/searches/${id}/recommendations`),
+  advice: (id: string) => request<Advice>(`/api/searches/${id}/advice`),
   radarDestinations: () =>
     request<{ origin: string; count: number; destinations: SeedAirport[] }>(
       "/api/radar/destinations",

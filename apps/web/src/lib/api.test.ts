@@ -86,6 +86,21 @@ describe("api client", () => {
     expect(radar).toHaveBeenCalledWith("/api/radar/destinations", expect.any(Object));
   });
 
+  it("GET advice tape /advice et renvoie le conseil", async () => {
+    const fn = mockFetch({
+      text: "Achète maintenant.",
+      action: "ACHETE_MAINTENANT",
+      verdict: "OK",
+      flagged: [],
+      fallback: false,
+      model: "rules",
+      generatedAt: "2026-10-01T00:00:00.000Z",
+    });
+    const res = await api.advice("s1");
+    expect(res.action).toBe("ACHETE_MAINTENANT");
+    expect(fn).toHaveBeenCalledWith("/api/searches/s1/advice", expect.any(Object));
+  });
+
   it("listAlerts passe le filtre searchId", async () => {
     const fn = mockFetch({ alerts: [] });
     await api.listAlerts("s1");

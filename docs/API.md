@@ -83,6 +83,17 @@ Voir [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md). `404` si la recherche est incon
 
 Liste seed statique des destinations long-courrier CDG (`{ iata, city, country, region }[]`) — sert à libeller le mode Radar. Aucun secret, aucune dépendance DB.
 
+### `GET /api/searches/:id/advice` → `Advice`
+
+Conseil en langage naturel (Phase 10) : `{ text, action, verdict, flagged[], fallback, model, facts, generatedAt }`.
+
+- `action` ∈ `COLLECTE | ACHETE_MAINTENANT | PRET_A_ACHETER | SURVEILLE | ATTENDS` — décidée par les règles, jamais par le modèle.
+- `model` : `rules` (générateur déterministe, défaut) ou l'id du modèle Claude si `ANTHROPIC_API_KEY` est configuré.
+- `verdict` : `OK`, ou `FLAGGED` si la réponse du modèle citait des valeurs hors de l'historique (`flagged[]`) — le texte est alors le repli déterministe (`fallback: true`).
+- `facts` : le jeu de faits exact soumis au modèle.
+
+Voir [`AI_ADVISOR.md`](AI_ADVISOR.md). `404` si la recherche est inconnue.
+
 ### `GET /api/searches/:id/events?limit=200` → `{ events: [...] }`
 
 `price_events` dérivés, le plus récent d'abord :

@@ -6,19 +6,19 @@ Moteur de surveillance et d'analyse des prix de billets d'avion en **Business Cl
 
 ## État d'avancement
 
-| Phase | Contenu                                                                                          | Statut       |
-| ----- | ------------------------------------------------------------------------------------------------ | ------------ |
-| 0     | Discovery : audit, providers, architecture, schéma, roadmap                                      | ✅ Terminée  |
-| 1     | Foundation : monorepo, TS strict, lint/format, tests, PostgreSQL/Redis, config, Docker, CI       | ✅ Terminée  |
-| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer                | ✅ Terminée  |
-| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                       | ✅ Terminée  |
-| 4     | Price history : snapshots, statistiques, tendances, détection d'événements, FX                   | ✅ Terminée  |
-| 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation                   | ✅ Terminée  |
-| 6     | Frontend : dashboard Next.js, graphiques, alertes                                                | ✅ Terminée  |
-| 7     | Real providers : sidecar Python `fast-flights` (fixture + live best-effort), `provider_requests` | ✅ Terminée  |
-| 8     | Notifications : canaux Telegram / Email (SMTP) / Webhook, retry, auto-activation par config      | ✅ Terminée  |
-| 9     | Smart recommendations : opportunity score, top-3 dates, mode Radar (classement destinations)     | ✅ Terminée  |
-| 10    | AI Advisor                                                                                       | 🟢 Prochaine |
+| Phase | Contenu                                                                                          | Statut      |
+| ----- | ------------------------------------------------------------------------------------------------ | ----------- |
+| 0     | Discovery : audit, providers, architecture, schéma, roadmap                                      | ✅ Terminée |
+| 1     | Foundation : monorepo, TS strict, lint/format, tests, PostgreSQL/Redis, config, Docker, CI       | ✅ Terminée |
+| 2     | Flight domain : `FlightOffer`, `FlightProvider`, `MockFlightProvider`, normalizer                | ✅ Terminée |
+| 3     | Search engine : recherches, génération de dates, queue, scheduler, workers                       | ✅ Terminée |
+| 4     | Price history : snapshots, statistiques, tendances, détection d'événements, FX                   | ✅ Terminée |
+| 5     | Alert engine : target / drop / flash drop / record low, cooldown, confirmation                   | ✅ Terminée |
+| 6     | Frontend : dashboard Next.js, graphiques, alertes                                                | ✅ Terminée |
+| 7     | Real providers : sidecar Python `fast-flights` (fixture + live best-effort), `provider_requests` | ✅ Terminée |
+| 8     | Notifications : canaux Telegram / Email (SMTP) / Webhook, retry, auto-activation par config      | ✅ Terminée |
+| 9     | Smart recommendations : opportunity score, top-3 dates, mode Radar (classement destinations)     | ✅ Terminée |
+| 10    | AI Advisor : conseil FR à partir des stats, garde-fou anti-invention + eval, Claude optionnel    | ✅ Terminée |
 
 ## Prérequis
 
@@ -92,7 +92,8 @@ packages/
   flight-providers/ interface FlightProvider, ProviderRegistry, Mock/Fixture/FastFlights providers
   normalizer/       contrôle qualité + déduplication des offres
   search-engine/    génération de dates, priorité, surveillance adaptative (pur)
-  analytics/        stats, tendance, dérivation des price_events (pur)
+  analytics/        stats, tendance, price_events, opportunity score + recommandations (pur)
+  advisor/          conseil langage naturel + garde-fou anti-invention (pur ; Claude optionnel)
   fx/               taux de change + normalisation en EUR (pur)
   alerting/         matching alertes, cooldown, confirmation, messages (pur)
   notifications/    NotificationService + canaux Console / Telegram / Email (SMTP) / Webhook + retry
@@ -100,7 +101,7 @@ packages/
   database/         schéma Drizzle + client postgres.js + migrations + repositories
 services/
   flight-scraper/   sidecar Python (FastAPI) isolant le scraper Google Flights `fast-flights`
-docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDATIONS, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
+docs/               ARCHITECTURE, DATABASE, API, WORKERS, ANALYTICS, RECOMMENDATIONS, AI_ADVISOR, NOTIFICATIONS, FRONTEND, FLIGHT_PROVIDERS, DEVELOPMENT, PHASE-0-DISCOVERY
 ```
 
 ## Scripts racine

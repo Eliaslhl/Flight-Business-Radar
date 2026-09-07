@@ -209,6 +209,19 @@ export interface SeedAirport {
   region: string;
 }
 
+export type AdviceAction =
+  "COLLECTE" | "ACHETE_MAINTENANT" | "PRET_A_ACHETER" | "SURVEILLE" | "ATTENDS";
+
+export interface Advice {
+  text: string;
+  action: AdviceAction;
+  verdict: "OK" | "FLAGGED";
+  flagged: string[];
+  fallback: boolean;
+  model: string;
+  generatedAt: string;
+}
+
 export interface CreateSearchInput {
   label?: string;
   origin: string;

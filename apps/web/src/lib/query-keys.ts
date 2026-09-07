@@ -7,6 +7,7 @@ export const qk = {
   prices: (id: string) => ["searches", id, "prices"] as const,
   analytics: (id: string) => ["searches", id, "analytics"] as const,
   recommendations: (id: string) => ["searches", id, "recommendations"] as const,
+  advice: (id: string) => ["searches", id, "advice"] as const,
   events: (id: string) => ["searches", id, "events"] as const,
   notifications: (id: string) => ["searches", id, "notifications"] as const,
   alerts: (searchId?: string) => ["alerts", searchId ?? "all"] as const,

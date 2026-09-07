@@ -12,7 +12,7 @@
 - **Config centralisée** : pas de `process.env` hors de `@fbr/config`.
 - **Logs structurés** : toujours via `@fbr/shared` `createLogger`, avec un `event` nommé (`LogEvent`).
 
-## Packages (état Phase 9)
+## Packages (état Phase 10)
 
 | Package                 | Rôle                                                                                                                                                                                                                                   | Dépend de                                  |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
@@ -23,6 +23,7 @@
 | `@fbr/normalizer`       | contrôle qualité (`validateOffer`), déduplication (`dedupeOffers`), orchestration (`normalizeSearchResults`)                                                                                                                           | `@fbr/flight-domain`, `@fbr/shared`        |
 | `@fbr/search-engine`    | pur : `generateDateCombinations` (anti-explosion), `computeSearchPriority`, `computeNextIntervalSeconds` (surveillance adaptative), mappers                                                                                            | `@fbr/flight-domain`, `@fbr/shared`        |
 | `@fbr/analytics`        | pur : stats descriptives / groupées, tendance, `derivePriceEvents`, `buildAnalyticsReport`, **`computeOpportunityScore` / `recommendDates` / `rankRadarDestinations` / `buildRecommendationReport`** (garde « données insuffisantes ») | `@fbr/shared`                              |
+| `@fbr/advisor`          | pur : `buildAdvisorInput`, `summarizeAdvice` (règles), `assertGrounded` (garde-fou anti-invention), `generateAdvice` ; `MockLlmClient` (défaut) + `AnthropicLlmClient` (fetch brut, si clé)                                            | `@fbr/analytics`, `@fbr/shared`            |
 | `@fbr/fx`               | pur : `FxProvider` (fixed / Frankfurter), `FxService` sur `RateStore` — normalisation en EUR                                                                                                                                           | `@fbr/shared`                              |
 | `@fbr/alerting`         | pur : `matchAlerts`, `isInCooldown`, `needsConfirmation` / `isPriceConfirmed`, `buildAlertNotification`                                                                                                                                | `@fbr/analytics`, `@fbr/shared`            |
 | `@fbr/notifications`    | `NotificationChannel` + `NotificationService.dispatch` (multi-canal isolé, `Promise.allSettled`) ; canaux `Console` / `Telegram` / `Email` (SMTP) / `Webhook` + `withRetry` (backoff, timeout)                                         | `@fbr/shared`, `nodemailer`                |
@@ -35,11 +36,11 @@
 | ------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `services/flight-scraper` | Python (FastAPI) | Sidecar isolant le scraper Google Flights `fast-flights` (Phase 0 §43). Modes `fixture` (défaut, fiable) / `live` (best-effort). Contrat HTTP `POST /search`. Consommé par `FastFlightsProvider`. Voir [`FLIGHT_PROVIDERS.md`](FLIGHT_PROVIDERS.md). |
 
-### Apps (état Phase 9)
+### Apps (état Phase 10)
 
 | App           | Rôle              | Détail                                                                                                                                                                                                                                                                                                                          |
 | ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fbr/api`    | API HTTP Fastify  | `/health` + `/api/searches` (CRUD, run, flights, prices, analytics, **recommendations**, events, notifications, provider-requests) + `/api/alerts` (CRUD) + `/api/notifications/channels` + `/api/radar/destinations`. Controllers fins.                                                                                        |
+| `@fbr/api`    | API HTTP Fastify  | `/health` + `/api/searches` (CRUD, run, flights, prices, analytics, recommendations, **advice**, events, notifications, provider-requests) + `/api/alerts` (CRUD) + `/api/notifications/channels` + `/api/radar/destinations`. Controllers fins.                                                                                |
 | `@fbr/worker` | Process de fond   | Scheduler + worker BullMQ : providers (`FastFlightsProvider` si `FAST_FLIGHTS_URL`, sinon `MockFlightProvider` ; **mode Radar → fan-out sur une tranche rotative de la liste seed**) → journal `provider_requests` → normalizer → `price_snapshots` (append-only, FX) → `analyzeOffers` → `runAlertPipeline` → replanification. |
 | `@fbr/web`    | Dashboard Next.js | App Router + TanStack Query + Recharts. **Découplé par HTTP** (aucun import `@fbr/*`) ; `next.config` proxie `/api/*` → API (pas de CORS). Pages : dashboard, recherches, détail (graphiques), alertes, réglages.                                                                                                               |
 

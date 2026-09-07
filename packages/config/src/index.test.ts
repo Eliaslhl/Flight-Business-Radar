@@ -105,6 +105,26 @@ describe("loadConfig", () => {
     expect(cfg.notifications.telegram).toBeNull();
   });
 
+  it("advisor : sans clé Anthropic, seul le modèle par défaut est exposé", () => {
+    const cfg = loadConfig({ ...baseEnv });
+    expect(cfg.advisor).toEqual({ anthropic: null, model: "claude-sonnet-5" });
+  });
+
+  it("advisor : structure la config Anthropic quand la clé est présente", () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      ANTHROPIC_API_KEY: "sk-abc",
+      ADVISOR_MODEL: "claude-opus-5",
+      ADVISOR_MAX_TOKENS: "800",
+    });
+    expect(cfg.advisor.anthropic).toEqual({
+      apiKey: "sk-abc",
+      model: "claude-opus-5",
+      maxTokens: 800,
+      timeoutMs: 20_000,
+    });
+  });
+
   it("expose la config du moteur de recherche avec ses défauts", () => {
     const cfg = loadConfig({ ...baseEnv });
     expect(cfg.engine).toEqual({
